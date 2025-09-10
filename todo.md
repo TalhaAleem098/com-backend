@@ -1,0 +1,1 @@
+Razorpay for transactions handlings in reality but in free version wo fake transactions allow krta h not real but we can still learn from it. 
