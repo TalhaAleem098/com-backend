@@ -1,6 +1,6 @@
 const Admin = require("@models/admin.models");
 const { generateHash } = require("@utils/sha");
-const { generateToken } = require("@utils/jwt.js");
+const { generateToken, verifyToken } = require("@utils/jwt.js");
 const { sendMail } = require("@services/mail");
 const {
   generateOtp,
@@ -170,27 +170,27 @@ const loginVerify = async (req, res, next) => {
         .status(400)
         .json({ message: "Invalid Credentials!", success: false });
     }
-    const {
-      otp: storedOtp,
-      ttl,
-      hadMarker,
-    } = await getOtpInfo(`admin-otp-${admin._id}`);
+    // const {
+    //   otp: storedOtp,
+    //   ttl,
+    //   hadMarker,
+    // } = await getOtpInfo(`admin-otp-${admin._id}`);
 
-    if (!hadMarker && !storedOtp) {
-      return res
-        .status(400)
-        .json({ message: "OTP does not exist", success: false });
-    }
+    // if (!hadMarker && !storedOtp) {
+    //   return res
+    //     .status(400)
+    //     .json({ message: "OTP does not exist", success: false });
+    // }
 
-    if (hadMarker && !storedOtp) {
-      return res.status(400).json({ message: "OTP expired", success: false });
-    }
+    // if (hadMarker && !storedOtp) {
+    //   return res.status(400).json({ message: "OTP expired", success: false });
+    // }
 
-    if (storedOtp !== otp) {
-      return res.status(400).json({ message: "Invalid OTP!", success: false });
-    }
+    // if (storedOtp !== otp) {
+    //   return res.status(400).json({ message: "Invalid OTP!", success: false });
+    // }
 
-    await deleteOtp(`admin-otp-${admin._id}`);
+    // await deleteOtp(`admin-otp-${admin._id}`);
 
     const payload = {
       id: admin._id,
@@ -305,4 +305,99 @@ const resendOtp = async (req, res, next) => {
   }
 };
 
-module.exports = { loginAdmin, loginVerify, resendOtp };
+const refreshToken = async (req, res, next) => {
+  try {
+    const refreshTokenFromCookie = req.cookies && req.cookies.refreshToken;
+
+    if (!refreshTokenFromCookie) {
+      console.log("No refresh token in cookies");
+      return res.status(401).json({
+        success: false,
+        message: "Refresh token not found. Please login again.",
+      });
+    }
+
+    let decoded;
+    try {
+      decoded = verifyToken(refreshTokenFromCookie);
+    } catch (error) {
+      res.clearCookie("refreshToken");
+      res.clearCookie("accessToken");
+      console.log("Invalid or expired refresh token:", error.message);
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token. Please login again.",
+      });
+    }
+
+    if (!decoded.id || decoded.role !== "admin") {
+      res.clearCookie("refreshToken");
+      res.clearCookie("accessToken");
+      console.log("Invalid token payload");
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token payload. Please login again.",
+      });
+    }
+
+    const admin = await Admin.findById(decoded.id);
+    if (!admin) {
+      res.clearCookie("refreshToken");
+      res.clearCookie("accessToken");
+      console.log("Admin not found for id:", decoded.id);
+      return res.status(404).json({
+        success: false,
+        message: "Admin not found. Please login again.",
+      });
+    }
+
+    const payload = {
+      id: admin._id,
+      name: admin.name,
+      role: "admin",
+      rememberMe: decoded.rememberMe || false,
+    };
+
+    const newAccessToken = await generateToken(
+      payload,
+      decoded.rememberMe || false,
+      60 * 60 * 1000 // 1 hour
+    );
+
+    let newRefreshToken;
+    if (decoded.rememberMe) {
+      newRefreshToken = await generateToken(
+        payload,
+        true,
+        30 * 24 * 60 * 60 * 1000 // 30 days
+      );
+    }
+
+    const commonCookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    };
+
+    res.cookie("accessToken", newAccessToken, {
+      ...commonCookieOptions,
+      maxAge: 60 * 60 * 1000, // 1 hour
+    });
+
+    if (newRefreshToken) {
+      res.cookie("refreshToken", newRefreshToken, {
+        ...commonCookieOptions,
+        maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Tokens refreshed successfully",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { loginAdmin, loginVerify, resendOtp, refreshToken };

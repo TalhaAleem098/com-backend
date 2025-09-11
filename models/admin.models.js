@@ -11,7 +11,7 @@ const adminSchema = new mongoose.Schema(
       encrypted: { type: String, required: true },
     },
     password: { type: String, required: true },
-    role: { type: String, enum: ["admin", "coAdmin"], default: "admin" },
+    role: { type: String, enum: ["admin", "coadmin"], default: "admin" },
     loginHistory: [
       {
         ip: String,
