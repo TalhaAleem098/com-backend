@@ -170,27 +170,27 @@ const loginVerify = async (req, res, next) => {
         .status(400)
         .json({ message: "Invalid Credentials!", success: false });
     }
-    // const {
-    //   otp: storedOtp,
-    //   ttl,
-    //   hadMarker,
-    // } = await getOtpInfo(`admin-otp-${admin._id}`);
+    const {
+      otp: storedOtp,
+      ttl,
+      hadMarker,
+    } = await getOtpInfo(`admin-otp-${admin._id}`);
 
-    // if (!hadMarker && !storedOtp) {
-    //   return res
-    //     .status(400)
-    //     .json({ message: "OTP does not exist", success: false });
-    // }
+    if (!hadMarker && !storedOtp) {
+      return res
+        .status(400)
+        .json({ message: "OTP does not exist", success: false });
+    }
 
-    // if (hadMarker && !storedOtp) {
-    //   return res.status(400).json({ message: "OTP expired", success: false });
-    // }
+    if (hadMarker && !storedOtp) {
+      return res.status(400).json({ message: "OTP expired", success: false });
+    }
 
-    // if (storedOtp !== otp) {
-    //   return res.status(400).json({ message: "Invalid OTP!", success: false });
-    // }
+    if (storedOtp !== otp) {
+      return res.status(400).json({ message: "Invalid OTP!", success: false });
+    }
 
-    // await deleteOtp(`admin-otp-${admin._id}`);
+    await deleteOtp(`admin-otp-${admin._id}`);
 
     const payload = {
       id: admin._id,
