@@ -303,15 +303,11 @@ const productSchema = new mongoose.Schema(
       },
     },
     category: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: [mongoose.Schema.Types.ObjectId],
       ref: "Category",
     },
-    subCategory: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "SubCategory",
-    },
     brand: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: [mongoose.Schema.Types.ObjectId],
       ref: "Brand",
     },
     productVariant: {
@@ -319,6 +315,10 @@ const productSchema = new mongoose.Schema(
       required: true,
     },
     isActive: {
+      type: Boolean,
+      default: true,
+    },
+    isPublic: {
       type: Boolean,
       default: true,
     },
