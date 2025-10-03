@@ -127,16 +127,61 @@ router.get('/one/:id', async (req, res) => {
     const branch = await getBranchById(id)
     if (!branch) return res.status(404).json({ message: 'Branch not found' })
 
+    const addr = branch.address || {}
+    const phone = branch.phone || {}
+    const loc = branch.location || {}
+
+    const days = [
+      'monday',
+      'tuesday',
+      'wednesday',
+      'thursday',
+      'friday',
+      'saturday',
+      'sunday',
+    ]
+
+    const openingHours = {}
+    days.forEach((d) => {
+      const src = (branch.openingHours && branch.openingHours[d]) || {}
+      openingHours[d] = {
+        isHoliday: !!src.isHoliday,
+        open: src.open || '',
+        close: src.close || '',
+        break: {
+          start: (src.break && src.break.start) || '',
+          end: (src.break && src.break.end) || '',
+        },
+      }
+    })
+
     const result = {
       _id: branch._id,
-      name: branch.name,
-      type: branch.type,
-      email: branch.email || null,
-      isActive: branch.isActive,
-      isDeliveryAvailable: branch.isDeliveryAvailable,
-      address: branch.address || {},
-      phone: branch.phone || {},
-      stock: branch.stock || {},
+      name: branch.name || '',
+      address: {
+        streetAddress: addr.streetAddress || '',
+        city: addr.city || '',
+        state: addr.state || '',
+        country: addr.country || '',
+        postalCode: addr.postalCode || '',
+      },
+      phone: {
+        primary: phone.primary || '',
+        secondary: phone.secondary || '',
+      },
+      email: branch.email || '',
+      location: {
+        type: loc.type || 'Point',
+        coordinates: Array.isArray(loc.coordinates) && loc.coordinates.length === 2 ? loc.coordinates : [0, 0],
+      },
+      type: branch.type || 'main',
+      isActive: typeof branch.isActive === 'boolean' ? branch.isActive : true,
+      isDeliveryAvailable: typeof branch.isDeliveryAvailable === 'boolean' ? branch.isDeliveryAvailable : false,
+      openingHours,
+      stock: branch.stock || { totalStocks: 0, productsCount: 0, products: [] },
+      totalStockValue: typeof branch.totalStockValue === 'number' ? branch.totalStockValue : 0,
+      createdAt: branch.createdAt || null,
+      updatedAt: branch.updatedAt || null,
     }
 
     return res.json({ branch: result })
