@@ -121,16 +121,12 @@ router.get('/one/:id', async (req, res) => {
   try {
     const { id } = req.params || {}
     if (!id || !id.trim()) return res.status(400).json({ message: 'Branch id is required' })
-
     if (!/^[0-9a-fA-F]{24}$/.test(String(id))) return res.status(400).json({ message: 'Invalid branch id' })
-
     const branch = await getBranchById(id)
     if (!branch) return res.status(404).json({ message: 'Branch not found' })
-
     const addr = branch.address || {}
     const phone = branch.phone || {}
     const loc = branch.location || {}
-
     const days = [
       'monday',
       'tuesday',
@@ -140,7 +136,6 @@ router.get('/one/:id', async (req, res) => {
       'saturday',
       'sunday',
     ]
-
     const openingHours = {}
     days.forEach((d) => {
       const src = (branch.openingHours && branch.openingHours[d]) || {}
@@ -154,7 +149,6 @@ router.get('/one/:id', async (req, res) => {
         },
       }
     })
-
     const result = {
       _id: branch._id,
       name: branch.name || '',

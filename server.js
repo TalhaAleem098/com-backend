@@ -6,10 +6,10 @@ require("./config/db")();
 const redis = require("@utils/redis");
 
 // app.set("trust proxy", true);
-app.use((req, res, next) => {
-  console.log("Request coming from : ", req.host);
-  next()
-})
+// app.use((req, res, next) => {
+//   console.log("Request coming from : ", req.host);
+//   next()
+// })
 
 app.use(require("./middlewares/main.js"));
 
