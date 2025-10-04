@@ -3,7 +3,6 @@ const app = express();
 require("module-alias/register");
 require("dotenv").config({ quiet: true });
 require("./config/db")();
-const redis = require("@utils/redis");
 
 // app.set("trust proxy", true);
 // app.use((req, res, next) => {
