@@ -199,14 +199,9 @@ router.get("/one/:id", async (req, res) => {
   }
 });
 
-router.get("/listings", async(req,res)=>{
+router.get("/listing", async(req,res)=>{
   try {
-    const { page, perPage, limit, q, sortBy, order, type, isActive } = req.query || {}
-
-    const query = { page, perPage, limit, q, sortBy, order, type, isActive }
-
-    const result = await listings(query)
-
+    const result = await listings()
     return res.json({
       success: true,
       ...result
@@ -216,6 +211,5 @@ router.get("/listings", async(req,res)=>{
     return res.status(500).json({ message: 'Something went wrong' })
   }
 })
-
 
 module.exports = router;

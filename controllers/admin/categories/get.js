@@ -14,12 +14,18 @@ function normalizeType(type) {
 }
 
 async function fetchBrands() {
-  const brands = await BrandModel.find({}).lean();
+  const brands = await BrandModel.find({})
+    .collation({ locale: "en", strength: 2 })
+    .sort({ name: 1 })
+    .lean();
   return brands || [];
 }
 
 async function fetchCategories() {
-  const categories = await CategoryModel.find({}).lean();
+  const categories = await CategoryModel.find({})
+    .collation({ locale: "en", strength: 2 })
+    .sort({ name: 1 })
+    .lean();
   return categories || [];
 }
 
