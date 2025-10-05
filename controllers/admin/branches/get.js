@@ -82,12 +82,50 @@ async function getBranches(query = {}) {
   }
 }
 
-module.exports = { getBranches }
-
 async function getBranchById(id) {
   if (!mongoose.isValidObjectId(String(id))) return null
   const branch = await BranchModel.findById(String(id)).lean()
   return branch || null
 }
 
-module.exports = { getBranches, getBranchById }
+async function listings(query = {}) {
+  let { page = 1, perPage, limit, q, sortBy = 'name', order = 'asc', type, isActive } = query
+  page = parseInt(page) || 1
+  let size = parseInt(perPage || limit) || 10
+  size = Math.min(200, Math.max(1, size))
+  const filter = {}
+  if (q) {
+    const re = new RegExp(String(q).trim(), 'i')
+    filter.$or = [
+      { name: re },
+      { 'address.city': re },
+      { 'address.state': re },
+      { 'address.country': re }
+    ]
+  }
+  if (type) filter.type = type.trim()
+  if (isActive !== undefined) filter.isActive = isActive === true || isActive === 'true' || isActive === '1'
+  const sortObj = { [sortBy]: order.toLowerCase() === 'desc' ? -1 : 1 }
+  const skip = (page - 1) * size
+  const projection = { name: 1, type: 1, isActive: 1, 'address.city': 1 }
+  const [total, data] = await Promise.all([
+    BranchModel.countDocuments(filter),
+    BranchModel.find(filter).select(projection).sort(sortObj).skip(skip).limit(size).lean()
+  ])
+  const items = (data || []).map((b) => ({
+    _id: b._id,
+    name: b.name || '',
+    type: b.type || '',
+    city: (b.address && b.address.city) || '',
+    isActive: typeof b.isActive === 'boolean' ? b.isActive : true
+  }))
+  return {
+    data: items,
+    page,
+    perPage: size,
+    total,
+    totalPages: Math.ceil(total / size) || 1
+  }
+}
+
+module.exports = { getBranches, getBranchById, listings }

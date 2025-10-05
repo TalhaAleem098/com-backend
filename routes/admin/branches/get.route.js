@@ -3,7 +3,7 @@ const { getBranches } = require("../../../controllers/admin/branches/get");
 const Settings = require("../../../models/settings.models");
 const BranchModel = require("../../../models/branches.models");
 
-const { getBranchById } = require("../../../controllers/admin/branches/get");
+const { getBranchById, listings } = require("../../../controllers/admin/branches/get");
 
 router.get("/", async (req, res) => {
   try {
@@ -60,13 +60,18 @@ router.get("/search", async (req, res) => {
   try {
     let { q } = req.query;
     if (!q || typeof q !== "string" || !q.trim()) {
-      return res.status(400).json({ message: "Query parameter 'q' is required" });
+      return res
+        .status(400)
+        .json({ message: "Query parameter 'q' is required" });
     }
     q = q.trim();
 
     const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-    const words = q.split(/\s+/).map((w) => w.trim()).filter(Boolean);
+    const words = q
+      .split(/\s+/)
+      .map((w) => w.trim())
+      .filter(Boolean);
 
     const fields = [
       "name",
@@ -117,72 +122,100 @@ router.get("/search", async (req, res) => {
   }
 });
 
-router.get('/one/:id', async (req, res) => {
+router.get("/one/:id", async (req, res) => {
   try {
-    const { id } = req.params || {}
-    if (!id || !id.trim()) return res.status(400).json({ message: 'Branch id is required' })
-    if (!/^[0-9a-fA-F]{24}$/.test(String(id))) return res.status(400).json({ message: 'Invalid branch id' })
-    const branch = await getBranchById(id)
-    if (!branch) return res.status(404).json({ message: 'Branch not found' })
-    const addr = branch.address || {}
-    const phone = branch.phone || {}
-    const loc = branch.location || {}
+    const { id } = req.params || {};
+    if (!id || !id.trim())
+      return res.status(400).json({ message: "Branch id is required" });
+    if (!/^[0-9a-fA-F]{24}$/.test(String(id)))
+      return res.status(400).json({ message: "Invalid branch id" });
+    const branch = await getBranchById(id);
+    if (!branch) return res.status(404).json({ message: "Branch not found" });
+    const addr = branch.address || {};
+    const phone = branch.phone || {};
+    const loc = branch.location || {};
     const days = [
-      'monday',
-      'tuesday',
-      'wednesday',
-      'thursday',
-      'friday',
-      'saturday',
-      'sunday',
-    ]
-    const openingHours = {}
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+      "sunday",
+    ];
+    const openingHours = {};
     days.forEach((d) => {
-      const src = (branch.openingHours && branch.openingHours[d]) || {}
+      const src = (branch.openingHours && branch.openingHours[d]) || {};
       openingHours[d] = {
         isHoliday: !!src.isHoliday,
-        open: src.open || '',
-        close: src.close || '',
+        open: src.open || "",
+        close: src.close || "",
         break: {
-          start: (src.break && src.break.start) || '',
-          end: (src.break && src.break.end) || '',
+          start: (src.break && src.break.start) || "",
+          end: (src.break && src.break.end) || "",
         },
-      }
-    })
+      };
+    });
     const result = {
       _id: branch._id,
-      name: branch.name || '',
+      name: branch.name || "",
       address: {
-        streetAddress: addr.streetAddress || '',
-        city: addr.city || '',
-        state: addr.state || '',
-        country: addr.country || '',
-        postalCode: addr.postalCode || '',
+        streetAddress: addr.streetAddress || "",
+        city: addr.city || "",
+        state: addr.state || "",
+        country: addr.country || "",
+        postalCode: addr.postalCode || "",
       },
       phone: {
-        primary: phone.primary || '',
-        secondary: phone.secondary || '',
+        primary: phone.primary || "",
+        secondary: phone.secondary || "",
       },
-      email: branch.email || '',
+      email: branch.email || "",
       location: {
-        type: loc.type || 'Point',
-        coordinates: Array.isArray(loc.coordinates) && loc.coordinates.length === 2 ? loc.coordinates : [0, 0],
+        type: loc.type || "Point",
+        coordinates:
+          Array.isArray(loc.coordinates) && loc.coordinates.length === 2
+            ? loc.coordinates
+            : [0, 0],
       },
-      type: branch.type || 'main',
-      isActive: typeof branch.isActive === 'boolean' ? branch.isActive : true,
-      isDeliveryAvailable: typeof branch.isDeliveryAvailable === 'boolean' ? branch.isDeliveryAvailable : false,
+      type: branch.type || "main",
+      isActive: typeof branch.isActive === "boolean" ? branch.isActive : true,
+      isDeliveryAvailable:
+        typeof branch.isDeliveryAvailable === "boolean"
+          ? branch.isDeliveryAvailable
+          : false,
       openingHours,
       stock: branch.stock || { totalStocks: 0, productsCount: 0, products: [] },
-      totalStockValue: typeof branch.totalStockValue === 'number' ? branch.totalStockValue : 0,
+      totalStockValue:
+        typeof branch.totalStockValue === "number" ? branch.totalStockValue : 0,
       createdAt: branch.createdAt || null,
       updatedAt: branch.updatedAt || null,
-    }
+    };
 
-    return res.json({ branch: result })
+    return res.json({ branch: result });
   } catch (err) {
-    console.error('Error fetching branch by id:', err)
+    console.error("Error fetching branch by id:", err);
+    return res.status(500).json({ message: "Something went wrong" });
+  }
+});
+
+router.get("/listings", async(req,res)=>{
+  try {
+    const { page, perPage, limit, q, sortBy, order, type, isActive } = req.query || {}
+
+    const query = { page, perPage, limit, q, sortBy, order, type, isActive }
+
+    const result = await listings(query)
+
+    return res.json({
+      success: true,
+      ...result
+    })
+  } catch (err) {
+    console.error('Error in listings route:', err)
     return res.status(500).json({ message: 'Something went wrong' })
   }
 })
+
 
 module.exports = router;

@@ -9,6 +9,45 @@ const getByPath = (obj, path) =>
       obj
     );
 
+const normalizeOpeningHours = (openingHours) => {
+  const days = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday",
+  ];
+
+  const cleanTime = (v) => {
+    if (v === undefined || v === null) return null;
+    if (typeof v !== "string") return null;
+    const t = v.trim();
+    if (!t) return null;
+    return t;
+  };
+
+  const src = openingHours && typeof openingHours === "object" ? openingHours : {};
+  const result = {};
+
+  for (const day of days) {
+    const d = src[day] && typeof src[day] === "object" ? src[day] : {};
+
+    result[day] = {
+      isHoliday: !!d.isHoliday,
+      open: cleanTime(d.open),
+      close: cleanTime(d.close),
+      break: {
+        start: cleanTime(d.break && d.break.start),
+        end: cleanTime(d.break && d.break.end),
+      },
+    };
+  }
+
+  return result;
+};
+
 router.post("/", async (req, res) => {
   try {
     const {
@@ -59,14 +98,14 @@ router.post("/", async (req, res) => {
 
     const branchData = {
       name: name.trim(),
-      type: type.trim(),
+      type: type && typeof type === "string" ? type.trim() : "main",
       address,
       phone,
       email: email?.trim() || null,
       isActive: typeof isActive === "boolean" ? isActive : true,
       isDeliveryAvailable:
         typeof isDeliveryAvailable === "boolean" ? isDeliveryAvailable : false,
-      openingHours: openingHours || {},
+      openingHours: normalizeOpeningHours(openingHours),
     };
 
     const branch = await Branches.create(branchData);
