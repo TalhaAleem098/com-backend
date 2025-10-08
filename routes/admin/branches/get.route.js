@@ -3,7 +3,10 @@ const { getBranches } = require("../../../controllers/admin/branches/get");
 const Settings = require("../../../models/settings.models");
 const BranchModel = require("../../../models/branches.models");
 
-const { getBranchById, listings } = require("../../../controllers/admin/branches/get");
+const {
+  getBranchById,
+  listings,
+} = require("../../../controllers/admin/branches/get");
 
 router.get("/", async (req, res) => {
   try {
@@ -199,17 +202,17 @@ router.get("/one/:id", async (req, res) => {
   }
 });
 
-router.get("/listing", async(req,res)=>{
+router.get("/listing", async (req, res) => {
   try {
-    const result = await listings()
+    const result = await listings();
     return res.json({
       success: true,
-      ...result
-    })
+      ...result,
+    });
   } catch (err) {
-    console.error('Error in listings route:', err)
-    return res.status(500).json({ message: 'Something went wrong' })
+    console.error("Error in listings route:", err);
+    return res.status(500).json({ message: "Something went wrong" });
   }
-})
+});
 
 module.exports = router;
