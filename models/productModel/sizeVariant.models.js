@@ -20,7 +20,6 @@ const sizeSubSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    
     images: [
       {
         url: { type: String, default: null },
