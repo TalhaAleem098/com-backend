@@ -126,6 +126,71 @@ branchSchema.pre("save", async function (next) {
   }
 });
 
+// Method to recalculate stock from actual product data
+branchSchema.methods.recalculateStock = async function() {
+  try {
+    const Product = require('./product.models');
+    
+    // Find all products that have stock in this branch
+    const products = await Product.find({
+      isDeleted: false,
+      $or: [
+        { "productVariant.nonVariant.locationDistribution.branch": this._id },
+        { "productVariant.sizeVariants.colors.locationDistribution.branch": this._id },
+        { "productVariant.colorVariants.sizes.locationDistribution.branch": this._id }
+      ]
+    });
+
+    let totalStocks = 0;
+    const productSummary = [];
+
+    products.forEach(product => {
+      let productStockInBranch = 0;
+
+      if (product.productVariant.variantType === "none") {
+        const location = product.productVariant.nonVariant.locationDistribution
+          .find(loc => loc.branch.toString() === this._id.toString());
+        if (location) productStockInBranch += location.stock;
+      } else if (product.productVariant.variantType === "size") {
+        product.productVariant.sizeVariants.forEach(size => {
+          size.colors.forEach(color => {
+            const location = color.locationDistribution
+              .find(loc => loc.branch.toString() === this._id.toString());
+            if (location) productStockInBranch += location.stock;
+          });
+        });
+      } else if (product.productVariant.variantType === "color") {
+        product.productVariant.colorVariants.forEach(color => {
+          color.sizes.forEach(size => {
+            const location = size.locationDistribution
+              .find(loc => loc.branch.toString() === this._id.toString());
+            if (location) productStockInBranch += location.stock;
+          });
+        });
+      }
+
+      if (productStockInBranch > 0) {
+        totalStocks += productStockInBranch;
+        productSummary.push({
+          productId: product._id,
+          quantity: productStockInBranch
+        });
+      }
+    });
+
+    this.stock = {
+      totalStocks,
+      productsCount: productSummary.length,
+      products: productSummary
+    };
+
+    return this.stock;
+  } catch (error) {
+    console.error('Error recalculating branch stock:', error);
+    return this.stock;
+  }
+};
+
 branchSchema.pre("save", function (next) {
   if (this.stock && Array.isArray(this.stock.products)) {
     this.stock.productsCount = this.stock.products.length;
@@ -134,8 +199,11 @@ branchSchema.pre("save", function (next) {
       0
     );
   } else {
-    this.stock.productsCount = 0;
-    this.stock.totalStocks = 0;
+    this.stock = {
+      totalStocks: 0,
+      productsCount: 0,
+      products: []
+    };
   }
   next();
 });

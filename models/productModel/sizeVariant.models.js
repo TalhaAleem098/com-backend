@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 const locationDistributionSchema = require("./locationDistribution.models");
 
-const sizeSubSchema = new mongoose.Schema(
+const colorInSizeSchema = new mongoose.Schema(
   {
-    name: {
+    colorName: {
       type: String,
       required: true,
     },
@@ -11,7 +11,6 @@ const sizeSubSchema = new mongoose.Schema(
       type: [locationDistributionSchema],
       default: [],
     },
-    // derived fields
     totalStock: {
       type: Number,
       default: 0,
@@ -20,12 +19,6 @@ const sizeSubSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    images: [
-      {
-        url: { type: String, default: null },
-        publicId: { type: String, default: null },
-      },
-    ],
     purchasePricePerUnit: { type: Number, default: 0 },
     basePricePerUnit: { type: Number, default: 0 },
     salePricePerUnit: { type: Number, default: null },
@@ -33,13 +26,47 @@ const sizeSubSchema = new mongoose.Schema(
   { _id: true }
 );
 
-// helper to recalc totalStock from locationDistribution
-sizeSubSchema.methods.recalculateTotal = function () {
+colorInSizeSchema.methods.recalculateTotal = function () {
   this.totalStock = (this.locationDistribution || []).reduce(
     (sum, loc) => sum + (loc.stock || 0),
     0
   );
   return this.totalStock;
+};
+
+const sizeSubSchema = new mongoose.Schema(
+  {
+    sizeName: {
+      type: String,
+      required: true,
+    },
+    abbreviation: {
+      type: String,
+      required: true,
+    },
+    images: [
+      {
+        url: { type: String, default: null },
+        publicId: { type: String, default: null },
+      },
+    ],
+    colors: {
+      type: [colorInSizeSchema],
+      default: [],
+    },
+  },
+  { _id: true }
+);
+
+// helper to recalc totalStock from all colors in this size
+sizeSubSchema.methods.recalculateTotal = function () {
+  if (this.colors && this.colors.length > 0) {
+    this.colors.forEach(color => {
+      if (color.recalculateTotal) {
+        color.recalculateTotal();
+      }
+    });
+  }
 };
 
 module.exports = sizeSubSchema;

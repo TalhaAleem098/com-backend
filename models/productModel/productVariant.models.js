@@ -8,33 +8,83 @@ const productVariantSchema = new mongoose.Schema(
     variantType: {
       type: String,
       default: "none",
-      enum: ["color", "size", "none"],
+      enum: ["color", "size", "none", "color-size"],
     },
-    sizeVariants: { type: [sizeSubSchema], default: [] },
-    colorVariants: { type: [colorSubSchema], default: [] },
-    nonVariant: { type: nonVariantSchema, default: {} },
-    defaultCurrency: { type: Object, default: { symbol: "Rs" } },
-    Measures: [
+    sizeVariants: { 
+      type: [sizeSubSchema], 
+      default: [] 
+    },
+    colorVariants: { 
+      type: [colorSubSchema], 
+      default: [] 
+    },
+    nonVariant: { 
+      type: nonVariantSchema, 
+      default: function() { return {}; }
+    },
+    defaultCurrency: { 
+      type: Object, 
+      default: { symbol: "Rs" } 
+    },
+    measures: [
       {
         rowName: { type: String, default: null },
         columns: [
-          { name: { type: String, default: null }, value: { type: Number, default: 0 } },
+          { 
+            name: { type: String, default: null }, 
+            value: { type: Number, default: 0 } 
+          },
         ],
       },
     ],
-    measureUnit: { type: String, default: null },
+    measureUnit: { 
+      type: String, 
+      default: null 
+    },
   },
   { _id: false }
 );
 
 productVariantSchema.methods.recalculateTotals = function () {
   if (this.variantType === "size") {
-    this.sizeVariants.forEach((sz) => sz.recalculateTotal && sz.recalculateTotal());
+    this.sizeVariants.forEach((sz) => {
+      if (sz.recalculateTotal) sz.recalculateTotal();
+    });
   } else if (this.variantType === "color") {
-    this.colorVariants.forEach((c) => c.recalculateTotal && c.recalculateTotal());
+    this.colorVariants.forEach((c) => {
+      if (c.recalculateTotal) c.recalculateTotal();
+    });
   } else if (this.variantType === "none") {
-    this.nonVariant.recalculateTotal && this.nonVariant.recalculateTotal();
+    if (this.nonVariant && this.nonVariant.recalculateTotal) {
+      this.nonVariant.recalculateTotal();
+    }
   }
+};
+
+productVariantSchema.methods.getTotalStock = function () {
+  let totalStock = 0;
+  
+  if (this.variantType === "size") {
+    this.sizeVariants.forEach(size => {
+      if (size.colors && size.colors.length > 0) {
+        size.colors.forEach(color => {
+          totalStock += color.totalStock || 0;
+        });
+      }
+    });
+  } else if (this.variantType === "color") {
+    this.colorVariants.forEach(color => {
+      if (color.sizes && color.sizes.length > 0) {
+        color.sizes.forEach(size => {
+          totalStock += size.totalStock || 0;
+        });
+      }
+    });
+  } else if (this.variantType === "none") {
+    totalStock = this.nonVariant?.totalStock || 0;
+  }
+  
+  return totalStock;
 };
 
 module.exports = productVariantSchema;
