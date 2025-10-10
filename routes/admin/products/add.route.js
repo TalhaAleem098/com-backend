@@ -1,179 +1,222 @@
 const express = require("express");
 const router = express.Router();
 const { upload } = require("@/utils/multer");
-const { uploadToCloudinary, uploadBufferToCloudinary } = require("@/utils/cloudinary");
+const {
+  uploadToCloudinary,
+  uploadBufferToCloudinary,
+} = require("@/utils/cloudinary");
 const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const Product = require("@/models/product.models");
 
+// ---------- Helpers ----------
+
+// Generate unique SKU
 const generateSKU = async () => {
-  let sku, exists = true;
+  let sku,
+    exists = true;
   while (exists) {
-    const raw = uuidv4().replace(/-/g, ""); // UUID without hyphens
-    sku = raw.substring(0, 6).toUpperCase();
+    sku = uuidv4().replace(/-/g, "").substring(0, 6).toUpperCase();
     exists = await Product.findOne({ sku });
   }
   return sku;
 };
 
-// Validation function
+// Validate product data
 const validateProductData = (basic, variantType, variantData) => {
   const errors = [];
 
   // Basic validation
-  if (!basic.name || String(basic.name).trim() === "") {
-    errors.push("Product name is required");
-  }
-  if (!basic.description || String(basic.description).trim() === "") {
-    errors.push("Product description is required");
-  }
-  if (!basic.category || (Array.isArray(basic.category) && basic.category.length === 0)) {
-    errors.push("At least one category is required");
-  }
-  if (!basic.brand || (Array.isArray(basic.brand) && basic.brand.length === 0)) {
-    errors.push("At least one brand is required");
-  }
+  const required = [
+    { field: basic.name, msg: "Product name is required" },
+    { field: basic.description, msg: "Product description is required" },
+    { field: basic.category, msg: "At least one category is required" },
+    { field: basic.brand, msg: "At least one brand is required" },
+  ];
 
-  // Variant specific validation
+  required.forEach(({ field, msg }) => {
+    if (!field || (Array.isArray(field) && field.length === 0))
+      errors.push(msg);
+  });
+
+  // Variant-specific validation
   if (variantType === "none") {
-    const noneVariant = variantData;
-    if (!noneVariant || !noneVariant.basePricePerUnit || noneVariant.basePricePerUnit <= 0) {
-      errors.push("Base price is required for non-variant products");
-    }
-    if (!noneVariant || !noneVariant.salePricePerUnit || noneVariant.salePricePerUnit <= 0) {
-      errors.push("Sale price is required for non-variant products");
-    }
-    if (!noneVariant || !noneVariant.locationDistribution || noneVariant.locationDistribution.length === 0) {
+    const v = variantData;
+    if (!v?.basePricePerUnit || v.basePricePerUnit <= 0)
+      errors.push("Base price is required");
+    if (!v?.salePricePerUnit || v.salePricePerUnit <= 0)
+      errors.push("Sale price is required");
+    if (!v?.locationDistribution?.length)
       errors.push("At least one location with stock is required");
-    }
-  } else if (variantType === "size") {
-    const sizeVariants = variantData;
-    if (!sizeVariants || sizeVariants.length === 0) {
-      errors.push("At least one size variant is required");
-    } else {
-      sizeVariants.forEach((size, sizeIndex) => {
-        if (!size.sizeName || !size.abbreviation) {
-          errors.push(`Size ${sizeIndex + 1}: Name and abbreviation are required`);
-        }
-        if (!size.colors || size.colors.length === 0) {
-          errors.push(`Size ${sizeIndex + 1}: At least one color is required`);
-        } else {
-          size.colors.forEach((color, colorIndex) => {
-            if (!color.colorName) {
-              errors.push(`Size ${sizeIndex + 1}, Color ${colorIndex + 1}: Color name is required`);
-            }
-            if (!color.basePricePerUnit || color.basePricePerUnit <= 0) {
-              errors.push(`Size ${sizeIndex + 1}, Color ${colorIndex + 1}: Base price is required`);
-            }
-            if (!color.salePricePerUnit || color.salePricePerUnit <= 0) {
-              errors.push(`Size ${sizeIndex + 1}, Color ${colorIndex + 1}: Sale price is required`);
-            }
-          });
-        }
-      });
-    }
-  } else if (variantType === "color") {
-    const colorVariants = variantData;
-    if (!colorVariants || colorVariants.length === 0) {
-      errors.push("At least one color variant is required");
-    } else {
-      colorVariants.forEach((color, colorIndex) => {
-        if (!color.colorName) {
-          errors.push(`Color ${colorIndex + 1}: Color name is required`);
-        }
-        if (!color.sizes || color.sizes.length === 0) {
-          errors.push(`Color ${colorIndex + 1}: At least one size is required`);
-        } else {
-          color.sizes.forEach((size, sizeIndex) => {
-            if (!size.sizeName || !size.abbreviation) {
-              errors.push(`Color ${colorIndex + 1}, Size ${sizeIndex + 1}: Name and abbreviation are required`);
-            }
-            if (!size.basePricePerUnit || size.basePricePerUnit <= 0) {
-              errors.push(`Color ${colorIndex + 1}, Size ${sizeIndex + 1}: Base price is required`);
-            }
-            if (!size.salePricePerUnit || size.salePricePerUnit <= 0) {
-              errors.push(`Color ${colorIndex + 1}, Size ${sizeIndex + 1}: Sale price is required`);
-            }
-          });
-        }
-      });
-    }
+  } else {
+    const variants = Array.isArray(variantData) ? variantData : [];
+    variants.forEach((v, i) => {
+      if (variantType === "size") {
+        if (!v.sizeName || !v.abbreviation)
+          errors.push(`Size ${i + 1}: Name & abbreviation required`);
+        v.colors?.forEach((c, j) => {
+          if (!c.colorName)
+            errors.push(`Size ${i + 1}, Color ${j + 1}: Color name required`);
+          if (!c.basePricePerUnit || c.basePricePerUnit <= 0)
+            errors.push(`Size ${i + 1}, Color ${j + 1}: Base price required`);
+          if (!c.salePricePerUnit || c.salePricePerUnit <= 0)
+            errors.push(`Size ${i + 1}, Color ${j + 1}: Sale price required`);
+        });
+      } else if (variantType === "color") {
+        if (!v.colorName) errors.push(`Color ${i + 1}: Color name required`);
+        v.sizes?.forEach((s, j) => {
+          if (!s.sizeName || !s.abbreviation)
+            errors.push(
+              `Color ${i + 1}, Size ${j + 1}: Name & abbreviation required`
+            );
+          if (!s.basePricePerUnit || s.basePricePerUnit <= 0)
+            errors.push(`Color ${i + 1}, Size ${j + 1}: Base price required`);
+          if (!s.salePricePerUnit || s.salePricePerUnit <= 0)
+            errors.push(`Color ${i + 1}, Size ${j + 1}: Sale price required`);
+        });
+      }
+    });
   }
 
   return errors;
 };
 
+// Compress image buffer
+const compressToWebP = async (buffer, targetMax = 1.4 * 1024 * 1024) => {
+  let out = await sharp(buffer).webp({ quality: 80 }).toBuffer();
+  let quality = 70;
+  while (out.length > targetMax && quality >= 40) {
+    out = await sharp(buffer)
+      .webp({ quality })
+      .toBuffer()
+      .catch(() => out);
+    quality -= 10;
+  }
+
+  if (out.length > targetMax) {
+    let width =
+      (
+        await sharp(buffer)
+          .metadata()
+          .catch(() => ({}))
+      ).width || null;
+    let factor = 0.9;
+    while (out.length > targetMax && factor > 0.3 && width) {
+      out = await sharp(buffer)
+        .resize(Math.round(width * factor))
+        .webp({ quality: 60 })
+        .toBuffer()
+        .catch(() => out);
+      factor -= 0.1;
+    }
+  }
+
+  if (out.length > targetMax)
+    throw new Error("Cannot compress image under 1.4MB");
+  return out;
+};
+
+// Map location distribution
+const mapLocations = (dist) =>
+  (dist || [])
+    .filter((ld) => ld.locationId)
+    .map((ld) => ({ branch: ld.locationId, stock: Number(ld.stock) || 0 }));
+
+// ---------- Route ----------
+
 router.post("/", upload.any(), async (req, res) => {
   try {
+    // Parse JSON fields
     const body = Object.fromEntries(
       Object.entries(req.body).map(([k, v]) => {
-        try { return [k, JSON.parse(v)]; } catch { return [k, v]; }
+        try {
+          return [k, JSON.parse(v)];
+        } catch {
+          return [k, v];
+        }
       })
     );
 
     const basic = body.basicInfo || {};
     const variantType = body.variantType || "none";
+    const variantData =
+      variantType === "none"
+        ? body.noneVariant || {}
+        : variantType === "size"
+        ? body.sizeVariants || []
+        : variantType === "color"
+        ? body.colorVariants || []
+        : null;
 
-    // Get variant data based on type
-    let variantData = null;
-    if (variantType === "none") {
-      variantData = body.noneVariant || {};
-    } else if (variantType === "size") {
-      variantData = body.sizeVariants || [];
-    } else if (variantType === "color") {
-      variantData = body.colorVariants || [];
-    }
+    // Validate
+    const errors = validateProductData(basic, variantType, variantData);
+    if (errors.length)
+      return res
+        .status(400)
+        .json({ success: false, message: "Validation failed", errors });
 
-    // Validate the data
-    const validationErrors = validateProductData(basic, variantType, variantData);
-    if (validationErrors.length > 0) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "Validation failed", 
-        errors: validationErrors 
-      });
-    }
-    
+    // Base product data
     const productData = {
-      name: basic.name?.trim() || null,
-      sku: basic.sku || await generateSKU(),
-      description: Array.isArray(basic.description) 
-        ? basic.description.filter(Boolean) 
+      name: basic.name?.trim(),
+      sku: basic.sku || (await generateSKU()),
+      description: Array.isArray(basic.description)
+        ? basic.description.filter(Boolean)
         : [basic.description].filter(Boolean),
-      tags: Array.isArray(basic.tags) 
-        ? basic.tags.filter(Boolean) 
-        : [],
+      tags: Array.isArray(basic.tags) ? basic.tags.filter(Boolean) : [],
       careInstructions: basic.careInstructions?.trim() || null,
       disclaimer: basic.disclaimer?.trim() || null,
       minStockToMaintain: Number(basic.minStock) || 0,
       defaultCurrency: basic.defaultCurrency || { symbol: "Rs" },
-      category: Array.isArray(basic.category) 
-        ? basic.category.filter(Boolean) 
+      category: Array.isArray(basic.category)
+        ? basic.category.filter(Boolean)
         : [basic.category].filter(Boolean),
-      brand: Array.isArray(basic.brand) 
-        ? basic.brand.filter(Boolean) 
+      brand: Array.isArray(basic.brand)
+        ? basic.brand.filter(Boolean)
         : [basic.brand].filter(Boolean),
       isActive: basic.isActive ?? true,
       isPublic: basic.isPublic ?? true,
-      displayImage: null, // Will be set during image processing
+      displayImage: null,
       productVariant: {
-        variantType: variantType,
+        variantType,
         defaultCurrency: basic.defaultCurrency || { symbol: "Rs" },
-        measures: Array.isArray(body.measurements) ? body.measurements.filter(m => m && (m.rowName || (m.columns && m.columns.length > 0))) : [],
+        measures: Array.isArray(body.measurements)
+          ? body.measurements.filter(
+              (m) => m && (m.rowName || (m.columns && m.columns.length))
+            )
+          : [],
         measureUnit: body.measureUnit || null,
       },
     };
 
-    // Handle different variant types
+    // ---------- Handle variants ----------
+    const handleVariantImages = async (variantImages, type) => {
+      if (!variantImages?.length) return [];
+      const uploaded = await Promise.all(
+        variantImages.map(async (file) => {
+          if (!file.mimetype.startsWith("image/"))
+            throw new Error(`Only images allowed: ${file.originalname}`);
+          if (file.size > 5 * 1024 * 1024)
+            throw new Error(`File too large: ${file.originalname}`);
+          const buf = await compressToWebP(file.buffer);
+          const result = await uploadBufferToCloudinary(buf, "products");
+          return {
+            url: result.file?.url || result.file?.secure_url,
+            publicId: result.file?.publicId || result.file?.public_id,
+          };
+        })
+      );
+      return uploaded;
+    };
+
+    // Map variants
     if (variantType === "none") {
       const none = variantData;
-      const locationDist = (none.locationDistribution || [])
-        .filter(ld => ld.locationId && ld.locationId.trim())
-        .map(ld => ({ branch: ld.locationId, stock: Number(ld.stock) || 0 }));
-      
       productData.productVariant.nonVariant = {
-        locationDistribution: locationDist,
-        totalStock: locationDist.reduce((sum, ld) => sum + ld.stock, 0),
+        locationDistribution: mapLocations(none.locationDistribution),
+        totalStock: mapLocations(none.locationDistribution).reduce(
+          (sum, ld) => sum + ld.stock,
+          0
+        ),
         sold: Number(none.sold) || 0,
         images: [],
         purchasePricePerUnit: Number(none.purchasePricePerUnit) || 0,
@@ -181,197 +224,113 @@ router.post("/", upload.any(), async (req, res) => {
         salePricePerUnit: Number(none.salePricePerUnit) || 0,
       };
     } else if (variantType === "size") {
-      const sizeVariants = variantData;
-      productData.productVariant.sizeVariants = sizeVariants.map(size => ({
-        sizeName: size.sizeName?.trim() || "",
-        abbreviation: size.abbreviation?.trim() || "",
-        images: [],
-        colors: (size.colors || []).map(color => {
-          const locationDist = (color.locationDistribution || [])
-            .filter(ld => ld.locationId && ld.locationId.trim())
-            .map(ld => ({ branch: ld.locationId, stock: Number(ld.stock) || 0 }));
-          
-          return {
+      productData.productVariant.sizeVariants = (variantData || []).map(
+        (size) => ({
+          sizeName: size.sizeName?.trim() || "",
+          abbreviation: size.abbreviation?.trim() || "",
+          images: [],
+          colors: (size.colors || []).map((color) => ({
             colorName: color.colorName?.trim() || "",
-            locationDistribution: locationDist,
-            totalStock: locationDist.reduce((sum, ld) => sum + ld.stock, 0),
+            locationDistribution: mapLocations(color.locationDistribution),
+            totalStock: mapLocations(color.locationDistribution).reduce(
+              (sum, ld) => sum + ld.stock,
+              0
+            ),
             sold: 0,
             purchasePricePerUnit: Number(color.purchasePricePerUnit) || 0,
             basePricePerUnit: Number(color.basePricePerUnit) || 0,
             salePricePerUnit: Number(color.salePricePerUnit) || 0,
-          };
+          })),
         })
-      }));
+      );
     } else if (variantType === "color") {
-      const colorVariants = variantData;
-      productData.productVariant.colorVariants = colorVariants.map(color => ({
-        colorName: color.colorName?.trim() || "",
-        images: [],
-        sizes: (color.sizes || []).map(size => {
-          const locationDist = (size.locationDistribution || [])
-            .filter(ld => ld.locationId && ld.locationId.trim())
-            .map(ld => ({ branch: ld.locationId, stock: Number(ld.stock) || 0 }));
-          
-          return {
+      productData.productVariant.colorVariants = (variantData || []).map(
+        (color) => ({
+          colorName: color.colorName?.trim() || "",
+          images: [],
+          sizes: (color.sizes || []).map((size) => ({
             sizeName: size.sizeName?.trim() || "",
             abbreviation: size.abbreviation?.trim() || "",
-            locationDistribution: locationDist,
-            totalStock: locationDist.reduce((sum, ld) => sum + ld.stock, 0),
+            locationDistribution: mapLocations(size.locationDistribution),
+            totalStock: mapLocations(size.locationDistribution).reduce(
+              (sum, ld) => sum + ld.stock,
+              0
+            ),
             sold: 0,
             purchasePricePerUnit: Number(size.purchasePricePerUnit) || 0,
             basePricePerUnit: Number(size.basePricePerUnit) || 0,
             salePricePerUnit: Number(size.salePricePerUnit) || 0,
-          };
+          })),
         })
-      }));
+      );
     }
 
-    // Handle image uploads
-    if (req.files && req.files.length) {
-      const HARD_LIMIT = 5 * 1024 * 1024; // 5MB
-      const TARGET_MAX = Math.floor(1.4 * 1024 * 1024); // 1.4MB
+    // ---------- Handle file uploads ----------
+    if (req.files?.length) {
+      const uploadedFiles = await handleVariantImages(req.files);
 
-      // Validate files
-      for (const f of req.files) {
-        if (!f.mimetype.startsWith("image/")) {
-          return res.status(400).json({ 
-            success: false, 
-            message: `Only images allowed: ${f.originalname}` 
-          });
-        }
-        if (f.size > HARD_LIMIT) {
-          return res.status(400).json({ 
-            success: false, 
-            message: `File too large: ${f.originalname}, max 5MB` 
-          });
-        }
-      }
+      uploadedFiles.forEach((file, i) => {
+        const field = req.files[i].fieldname;
+        if (!file?.url) return;
+        const fileObj = { url: file.url, publicId: file.publicId };
 
-      // Image compression function
-      const compressToWebP = async buffer => {
-        let out = await sharp(buffer).webp({ quality: 80 }).toBuffer();
-        let quality = 70;
-        while (out.length > TARGET_MAX && quality >= 40) {
-          out = await sharp(buffer).webp({ quality }).toBuffer().catch(() => out);
-          quality -= 10;
-        }
-        if (out.length > TARGET_MAX) {
-          let width = (await sharp(buffer).metadata().catch(() => ({}))).width || null;
-          let factor = 0.9;
-          while (out.length > TARGET_MAX && factor > 0.3 && width) {
-            out = await sharp(buffer).resize(Math.round(width * factor)).webp({ quality: 60 }).toBuffer().catch(() => out);
-            factor -= 0.1;
-          }
-        }
-        if (out.length > TARGET_MAX) throw new Error("Cannot compress image under 1.4MB");
-        return out;
-      };
-
-      // Upload all files
-      const uploaded = await Promise.all(req.files.map(async file => {
-        try {
-          const buf = await compressToWebP(file.buffer);
-          const result = await uploadBufferToCloudinary(buf, "products");
-          return { 
-            fieldname: file.fieldname, 
-            success: result.success,
-            file: result.file 
-          };
-        } catch (error) {
-          console.error(`Failed to process ${file.fieldname}:`, error);
-          return { fieldname: file.fieldname, success: false, error: error.message };
-        }
-      }));
-
-      // Process uploaded files
-      for (const u of uploaded) {
-        if (!u?.success || !u.file) continue;
-        
-        const fileObj = { 
-          url: u.file.url || u.file.secure_url || null, 
-          publicId: u.file.publicId || u.file.public_id || null 
-        };
-        
-        // Handle display image
-        if (u.fieldname === "displayImage") {
-          productData.displayImage = fileObj.url;
-        }
-        // Handle non-variant images
-        else if (variantType === "none" && u.fieldname.startsWith("noneVariant_")) {
+        if (field === "displayImage") productData.displayImage = fileObj.url;
+        else if (variantType === "none" && field.startsWith("noneVariant_"))
           productData.productVariant.nonVariant.images.push(fileObj);
-        }
-        // Handle size variant images
         else if (variantType === "size") {
-          const sizeMatch = u.fieldname.match(/^sizeVariant_(\d+)_image_/);
-          if (sizeMatch) {
-            const sizeIndex = parseInt(sizeMatch[1]);
-            if (productData.productVariant.sizeVariants[sizeIndex]) {
-              productData.productVariant.sizeVariants[sizeIndex].images.push(fileObj);
-            }
-          }
+          const match = field.match(/^sizeVariant_(\d+)_image_/);
+          if (match)
+            productData.productVariant.sizeVariants[
+              parseInt(match[1])
+            ].images.push(fileObj);
+        } else if (variantType === "color") {
+          const match = field.match(/^colorVariant_(\d+)_image_/);
+          if (match)
+            productData.productVariant.colorVariants[
+              parseInt(match[1])
+            ].images.push(fileObj);
         }
-        // Handle color variant images
-        else if (variantType === "color") {
-          const colorMatch = u.fieldname.match(/^colorVariant_(\d+)_image_/);
-          if (colorMatch) {
-            const colorIndex = parseInt(colorMatch[1]);
-            if (productData.productVariant.colorVariants[colorIndex]) {
-              productData.productVariant.colorVariants[colorIndex].images.push(fileObj);
-            }
-          }
-        }
-      }
+      });
     }
 
+    // ---------- Save product ----------
     const product = new Product(productData);
-    
-    // Recalculate totals if method exists
-    if (product.productVariant?.recalculateTotals) {
-      try { 
-        product.productVariant.recalculateTotals(); 
-      } catch (error) {
-        console.error("Error recalculating totals:", error);
-      }
-    }
-    
+    if (product.productVariant?.recalculateTotals)
+      product.productVariant.recalculateTotals();
     await product.save();
 
-    res.status(201).json({ 
-      success: true, 
-      message: "Product created successfully",
-      data: {
-        id: product._id,
-        name: product.name,
-        sku: product.sku
-      }
-    });
-
+    res
+      .status(201)
+      .json({
+        success: true,
+        message: "Product created successfully",
+        data: { id: product._id, name: product.name, sku: product.sku },
+      });
   } catch (err) {
     console.error("Error creating product:", err);
-    
-    // Handle validation errors
-    if (err.name === 'ValidationError') {
-      const validationErrors = Object.values(err.errors).map(error => error.message);
-      return res.status(400).json({ 
-        success: false, 
-        message: "Validation failed", 
-        errors: validationErrors 
-      });
+    if (err.name === "ValidationError") {
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Validation failed",
+          errors: Object.values(err.errors).map((e) => e.message),
+        });
     }
-    
-    // Handle duplicate key errors
-    if (err.code === 11000) {
-      return res.status(400).json({ 
-        success: false, 
-        message: "A product with this SKU already exists" 
+    if (err.code === 11000)
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "A product with this SKU already exists",
+        });
+    res
+      .status(500)
+      .json({
+        success: false,
+        message: "Internal Server Error",
+        error: process.env.NODE_ENV === "development" ? err.message : undefined,
       });
-    }
-    
-    res.status(500).json({ 
-      success: false, 
-      message: "Internal Server Error",
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
   }
 });
 

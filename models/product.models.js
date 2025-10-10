@@ -83,28 +83,42 @@ productSchema.post('save', async function(doc) {
     // Update categories
     if (doc.category && doc.category.length > 0) {
       const Category = mongoose.model('Category');
-      
+
       for (const categoryId of doc.category) {
-        await Category.findByIdAndUpdate(
-          categoryId,
-          { 
-            $addToSet: { items: doc._id },
+        try {
+          const category = await Category.findById(categoryId);
+          if (!category) continue;
+          // add product id only if not present
+          const exists = (category.items || []).some(id => id.toString() === doc._id.toString());
+          if (!exists) {
+            category.items = category.items || [];
+            category.items.push(doc._id);
+            // save so pre-save hook updates itemCount reliably
+            await category.save();
           }
-        );
+        } catch (err) {
+          console.error('Error updating category for product post-save:', err);
+        }
       }
     }
 
     // Update brands
     if (doc.brand && doc.brand.length > 0) {
       const Brand = mongoose.model('Brand');
-      
+
       for (const brandId of doc.brand) {
-        await Brand.findByIdAndUpdate(
-          brandId,
-          { 
-            $addToSet: { items: doc._id },
+        try {
+          const brand = await Brand.findById(brandId);
+          if (!brand) continue;
+          const exists = (brand.items || []).some(id => id.toString() === doc._id.toString());
+          if (!exists) {
+            brand.items = brand.items || [];
+            brand.items.push(doc._id);
+            await brand.save();
           }
-        );
+        } catch (err) {
+          console.error('Error updating brand for product post-save:', err);
+        }
       }
     }
 
@@ -138,20 +152,27 @@ productSchema.post('save', async function(doc) {
         });
       }
 
-      // Update branches
+      // Update branches by loading and saving so branch pre-save recalculates totals
       for (const location of locations) {
-        if (location.branch && location.stock > 0) {
-          await Branch.findByIdAndUpdate(
-            location.branch,
-            {
-              $addToSet: {
-                'stock.products': {
-                  productId: doc._id,
-                  quantity: location.stock
-                }
-              }
-            }
-          );
+        if (!location.branch) continue;
+        try {
+          const branch = await Branch.findById(location.branch);
+          if (!branch) continue;
+
+          branch.stock = branch.stock || { products: [] };
+          const existingIndex = (branch.stock.products || []).findIndex(p => p.productId.toString() === doc._id.toString());
+          if (existingIndex >= 0) {
+            // update quantity
+            branch.stock.products[existingIndex].quantity = location.stock || 0;
+          } else {
+            // only add if stock is positive (you can change logic as needed)
+            branch.stock.products.push({ productId: doc._id, quantity: location.stock || 0 });
+          }
+
+          // save branch to trigger pre-save recalculation of counts/totals
+          await branch.save();
+        } catch (err) {
+          console.error('Error updating branch for product post-save:', err);
         }
       }
     }
