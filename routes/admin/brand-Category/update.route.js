@@ -34,7 +34,6 @@ router.put("/brand/:id", async (req, res) => {
     await brand.save();
     res.json({ message: "Brand updated", brand });
   } catch (err) {
-    console.error("Error updating brand", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
@@ -78,7 +77,6 @@ router.put("/category/:id", async (req, res) => {
     await category.save();
     res.json({ message: "Category updated", category });
   } catch (err) {
-    console.error("Error updating category", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });

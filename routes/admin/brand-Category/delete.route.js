@@ -8,7 +8,9 @@ router.delete('/brand/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const brand = await BrandModel.findById(id).lean();
-    if (!brand) return res.status(404).json({ message: 'Brand not found' });
+    if (!brand) {
+      return res.status(404).json({ message: 'Brand not found' });
+    }
 
     // Check itemCount and products referencing this brand
     const productsReferencing = await ProductModel.find({ brand: id, isDeleted: false }).limit(1).lean();
@@ -21,7 +23,6 @@ router.delete('/brand/:id', async (req, res) => {
     await BrandModel.deleteOne({ _id: id });
     res.json({ message: 'Brand deleted' });
   } catch (err) {
-    console.error('Error deleting brand', err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });
@@ -31,9 +32,10 @@ router.delete('/category/:id', async (req, res) => {
   try {
     const id = req.params.id;
     const category = await CategoryModel.findById(id).lean();
-    if (!category) return res.status(404).json({ message: 'Category not found' });
+    if (!category) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
 
-    // check itemCount and products referencing this category
     const productsReferencing = await ProductModel.find({ category: id, isDeleted: false }).limit(1).lean();
     const hasProducts = productsReferencing && productsReferencing.length > 0;
 
@@ -44,7 +46,6 @@ router.delete('/category/:id', async (req, res) => {
     await CategoryModel.deleteOne({ _id: id });
     res.json({ message: 'Category deleted' });
   } catch (err) {
-    console.error('Error deleting category', err);
     res.status(500).json({ message: 'Internal server error' });
   }
 });

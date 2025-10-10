@@ -23,7 +23,14 @@ async function fetchBrands() {
   return (
     (await BrandModel.find(
       {},
-      { _id: 1, name: 1, itemCount: 1, createdAt: 1, updatedAt: 1 }
+      {
+        _id: 1,
+        name: 1,
+        itemCount: 1,
+        createdAt: 1,
+        updatedAt: 1,
+        description: 1,
+      }
     )
       .collation({ locale: "en", strength: 2 })
       .sort({ name: 1 })
@@ -35,7 +42,7 @@ async function fetchCategories() {
   return (
     (await CategoryModel.find(
       {},
-      { _id: 1, name: 1, itemCount: 1, createdAt: 1, updatedAt: 1 }
+      { _id: 1, name: 1, itemCount: 1, createdAt: 1, updatedAt: 1, description: 1 }
     )
       .collation({ locale: "en", strength: 2 })
       .sort({ name: 1 })
