@@ -80,7 +80,6 @@ const productSchema = new mongoose.Schema(
 
 productSchema.post('save', async function(doc) {
   try {
-    // Update categories
     if (doc.category && doc.category.length > 0) {
       const Category = mongoose.model('Category');
 
@@ -125,51 +124,73 @@ productSchema.post('save', async function(doc) {
     // Update branch stock
     if (doc.productVariant) {
       const Branch = mongoose.model('Branch');
-      const locations = [];
+      const branchStockMap = new Map();
 
-      // Collect all location distributions
       if (doc.productVariant.variantType === 'none' && doc.productVariant.nonVariant?.locationDistribution) {
-        locations.push(...doc.productVariant.nonVariant.locationDistribution);
+        doc.productVariant.nonVariant.locationDistribution.forEach(location => {
+          if (location.branch) {
+            const branchId = location.branch.toString();
+            const currentStock = branchStockMap.get(branchId) || 0;
+            branchStockMap.set(branchId, currentStock + (location.stock || 0));
+          }
+        });
       } else if (doc.productVariant.variantType === 'size' && doc.productVariant.sizeVariants) {
         doc.productVariant.sizeVariants.forEach(size => {
-          if (size.colors) {
+          if (size.colors && Array.isArray(size.colors)) {
             size.colors.forEach(color => {
-              if (color.locationDistribution) {
-                locations.push(...color.locationDistribution);
+              if (color.locationDistribution && Array.isArray(color.locationDistribution)) {
+                color.locationDistribution.forEach(location => {
+                  if (location.branch) {
+                    const branchId = location.branch.toString();
+                    const currentStock = branchStockMap.get(branchId) || 0;
+                    branchStockMap.set(branchId, currentStock + (location.stock || 0));
+                  }
+                });
               }
             });
           }
         });
       } else if (doc.productVariant.variantType === 'color' && doc.productVariant.colorVariants) {
         doc.productVariant.colorVariants.forEach(color => {
-          if (color.sizes) {
+          if (color.sizes && Array.isArray(color.sizes)) {
             color.sizes.forEach(size => {
-              if (size.locationDistribution) {
-                locations.push(...size.locationDistribution);
+              if (size.locationDistribution && Array.isArray(size.locationDistribution)) {
+                size.locationDistribution.forEach(location => {
+                  if (location.branch) {
+                    const branchId = location.branch.toString();
+                    const currentStock = branchStockMap.get(branchId) || 0;
+                    branchStockMap.set(branchId, currentStock + (location.stock || 0));
+                  }
+                });
               }
             });
           }
         });
       }
 
-      // Update branches by loading and saving so branch pre-save recalculates totals
-      for (const location of locations) {
-        if (!location.branch) continue;
+      for (const [branchId, totalStock] of branchStockMap.entries()) {
         try {
-          const branch = await Branch.findById(location.branch);
+          const branch = await Branch.findById(branchId);
           if (!branch) continue;
 
-          branch.stock = branch.stock || { products: [] };
-          const existingIndex = (branch.stock.products || []).findIndex(p => p.productId.toString() === doc._id.toString());
+          branch.stock = branch.stock || { products: [], productsCount: 0, totalStocks: 0 };
+          branch.stock.products = branch.stock.products || [];
+
+          const existingIndex = branch.stock.products.findIndex(
+            p => p.productId.toString() === doc._id.toString()
+          );
+
           if (existingIndex >= 0) {
-            // update quantity
-            branch.stock.products[existingIndex].quantity = location.stock || 0;
+            branch.stock.products[existingIndex].quantity = totalStock;
           } else {
-            // only add if stock is positive (you can change logic as needed)
-            branch.stock.products.push({ productId: doc._id, quantity: location.stock || 0 });
+            if (totalStock > 0) {
+              branch.stock.products.push({
+                productId: doc._id,
+                quantity: totalStock
+              });
+            }
           }
 
-          // save branch to trigger pre-save recalculation of counts/totals
           await branch.save();
         } catch (err) {
           console.error('Error updating branch for product post-save:', err);
@@ -185,44 +206,91 @@ productSchema.post('save', async function(doc) {
 productSchema.post('findOneAndUpdate', async function(doc) {
   if (doc && this.getUpdate()?.isDeleted === true) {
     try {
-      // Remove from categories
       if (doc.category && doc.category.length > 0) {
         const Category = mongoose.model('Category');
         
         for (const categoryId of doc.category) {
-          await Category.findByIdAndUpdate(
-            categoryId,
-            { 
-              $pull: { items: doc._id },
+          try {
+            const category = await Category.findById(categoryId);
+            if (category) {
+              category.items = (category.items || []).filter(
+                id => id.toString() !== doc._id.toString()
+              );
+              await category.save();
             }
-          );
+          } catch (err) {
+            console.error('Error removing product from category:', err);
+          }
         }
       }
 
-      // Remove from brands
       if (doc.brand && doc.brand.length > 0) {
         const Brand = mongoose.model('Brand');
         
         for (const brandId of doc.brand) {
-          await Brand.findByIdAndUpdate(
-            brandId,
-            { 
-              $pull: { items: doc._id },
+          try {
+            const brand = await Brand.findById(brandId);
+            if (brand) {
+              brand.items = (brand.items || []).filter(
+                id => id.toString() !== doc._id.toString()
+              );
+              await brand.save();
             }
-          );
+          } catch (err) {
+            console.error('Error removing product from brand:', err);
+          }
         }
       }
 
-      // Remove from branches
       const Branch = mongoose.model('Branch');
-      await Branch.updateMany(
-        {},
-        {
-          $pull: {
-            'stock.products': { productId: doc._id }
-          }
+      const branchIds = new Set();
+
+      if (doc.productVariant) {
+        if (doc.productVariant.variantType === 'none' && doc.productVariant.nonVariant?.locationDistribution) {
+          doc.productVariant.nonVariant.locationDistribution.forEach(loc => {
+            if (loc.branch) branchIds.add(loc.branch.toString());
+          });
+        } else if (doc.productVariant.variantType === 'size' && doc.productVariant.sizeVariants) {
+          doc.productVariant.sizeVariants.forEach(size => {
+            if (size.colors) {
+              size.colors.forEach(color => {
+                if (color.locationDistribution) {
+                  color.locationDistribution.forEach(loc => {
+                    if (loc.branch) branchIds.add(loc.branch.toString());
+                  });
+                }
+              });
+            }
+          });
+        } else if (doc.productVariant.variantType === 'color' && doc.productVariant.colorVariants) {
+          doc.productVariant.colorVariants.forEach(color => {
+            if (color.sizes) {
+              color.sizes.forEach(size => {
+                if (size.locationDistribution) {
+                  size.locationDistribution.forEach(loc => {
+                    if (loc.branch) branchIds.add(loc.branch.toString());
+                  });
+                }
+              });
+            }
+          });
         }
-      );
+      }
+
+      for (const branchId of branchIds) {
+        try {
+          const branch = await Branch.findById(branchId);
+          if (branch) {
+            branch.stock = branch.stock || { products: [] };
+            branch.stock.products = (branch.stock.products || []).filter(
+              p => p.productId.toString() !== doc._id.toString()
+            );
+            await branch.save();
+          }
+        } catch (err) {
+          console.error('Error removing product from branch:', err);
+        }
+      }
     } catch (error) {
       console.error('Error in product update middleware:', error);
     }

@@ -9,9 +9,7 @@ const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const Product = require("@/models/product.models");
 
-// ---------- Helpers ----------
 
-// Generate unique SKU
 const generateSKU = async () => {
   let sku,
     exists = true;
@@ -22,7 +20,6 @@ const generateSKU = async () => {
   return sku;
 };
 
-// Validate product data
 const validateProductData = (basic, variantType, variantData) => {
   const errors = [];
 
@@ -81,7 +78,6 @@ const validateProductData = (basic, variantType, variantData) => {
   return errors;
 };
 
-// Compress image buffer
 const compressToWebP = async (buffer, targetMax = 1.4 * 1024 * 1024) => {
   let out = await sharp(buffer).webp({ quality: 80 }).toBuffer();
   let quality = 70;
@@ -299,13 +295,11 @@ router.post("/", upload.any(), async (req, res) => {
       product.productVariant.recalculateTotals();
     await product.save();
 
-    res
-      .status(201)
-      .json({
-        success: true,
-        message: "Product created successfully",
-        data: { id: product._id, name: product.name, sku: product.sku },
-      });
+    res.status(201).json({
+      success: true,
+      message: "Product created successfully",
+      data: { id: product._id, name: product.name, sku: product.sku },
+    });
   } catch (err) {
     console.error("Error creating product:", err);
     if (err.name === "ValidationError") {
