@@ -6,6 +6,11 @@ require("./config/db")();
 
 app.use(require("./middlewares/main.js"));
 
+// app.use(async (req,res,next)=>{
+//   await new Promise((resolve)=>setTimeout(resolve,10000));
+//   next();
+// })
+
 app.use("/api", require("./routes/api.route.js"));
 
 app.use((req, res, next) => {
@@ -27,7 +32,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
-  });
+  })
 });
 
 const PORT = process.env.PORT || 3000;

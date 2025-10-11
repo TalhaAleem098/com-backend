@@ -1,7 +1,6 @@
 const BrandModel = require("../../../models/brand.models");
 const CategoryModel = require("../../../models/category.models");
 
-/* -------------------- TYPE NORMALIZATION -------------------- */
 function normalizeType(type) {
   if (!type || typeof type !== "string") return "all";
 
@@ -18,7 +17,6 @@ function normalizeType(type) {
   return "all";
 }
 
-/* -------------------- FETCH HELPERS -------------------- */
 async function fetchBrands() {
   return (
     (await BrandModel.find(
@@ -63,7 +61,7 @@ async function fetchByType(type) {
       result.categories = await fetchCategories();
       break;
 
-    default: // "all"
+    default:
       const [brands, categories] = await Promise.all([
         fetchBrands(),
         fetchCategories(),
