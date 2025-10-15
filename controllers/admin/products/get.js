@@ -7,7 +7,7 @@ async function getAllProducts(page = 1, limit = 10, filters = {}) {
 
     const [products, total] = await Promise.all([
       Product.find(query)
-        .select("name description displayImage sku isActive isPublic productVariant.variantType category brand createdAt updatedAt")
+        .select("name description displayImage minStockToMaintain sku isActive isPublic productVariant category brand createdAt updatedAt")
         .populate("category", "name")
         .populate("brand", "name")
         .sort({ createdAt: -1 })
@@ -23,16 +23,31 @@ async function getAllProducts(page = 1, limit = 10, filters = {}) {
 
       if (product.productVariant?.variantType === "none") {
         const nv = product.productVariant.nonVariant;
-        totalStock = nv?.totalStock || 0;
+        let noneStock = 0;
+        
+        if (nv?.locationDistribution && Array.isArray(nv.locationDistribution)) {
+          nv.locationDistribution.forEach(loc => {
+            noneStock += loc.stock || 0;
+          });
+        }
+        
+        totalStock = noneStock;
         variants = [{
           type: "none",
-          stock: totalStock
+          stock: noneStock
         }];
       } else if (product.productVariant?.variantType === "size") {
         product.productVariant.sizeVariants?.forEach(size => {
           if (size.colors && Array.isArray(size.colors)) {
             size.colors.forEach(color => {
-              const colorStock = color.totalStock || 0;
+              let colorStock = 0;
+              
+              if (color.locationDistribution && Array.isArray(color.locationDistribution)) {
+                color.locationDistribution.forEach(loc => {
+                  colorStock += loc.stock || 0;
+                });
+              }
+              
               totalStock += colorStock;
               variants.push({
                 type: "size-color",
@@ -48,7 +63,14 @@ async function getAllProducts(page = 1, limit = 10, filters = {}) {
         product.productVariant.colorVariants?.forEach(color => {
           if (color.sizes && Array.isArray(color.sizes)) {
             color.sizes.forEach(size => {
-              const sizeStock = size.totalStock || 0;
+              let sizeStock = 0;
+              
+              if (size.locationDistribution && Array.isArray(size.locationDistribution)) {
+                size.locationDistribution.forEach(loc => {
+                  sizeStock += loc.stock || 0;
+                });
+              }
+              
               totalStock += sizeStock;
               variants.push({
                 type: "color-size",
@@ -71,6 +93,7 @@ async function getAllProducts(page = 1, limit = 10, filters = {}) {
         isActive: product.isActive,
         isPublic: product.isPublic,
         variantType: product.productVariant?.variantType,
+        minStockToMaintain: product.minStockToMaintain,
         totalStock,
         variants,
         category: product.category,
