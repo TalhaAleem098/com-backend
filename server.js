@@ -3,6 +3,10 @@ const app = express();
 require("module-alias/register");
 require("dotenv").config({ quiet: true });
 require("./config/db")();
+const { initializeCronJobs } = require("./utils/cron");
+
+// Initialize cron jobs for cleanup
+initializeCronJobs();
 
 app.use(require("./middlewares/main.js"));
 

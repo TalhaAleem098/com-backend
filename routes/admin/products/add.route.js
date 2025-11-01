@@ -1,11 +1,9 @@
 const express = require("express");
 const router = express.Router();
-const { upload } = require("@/utils/multer");
 const {
-  uploadToCloudinary,
-  uploadBufferToCloudinary,
+  moveImageFromTemp,
+  deleteFromCloudinary,
 } = require("@/utils/cloudinary");
-const sharp = require("sharp");
 const { v4: uuidv4 } = require("uuid");
 const Product = require("@/models/product.models");
 
@@ -78,61 +76,67 @@ const validateProductData = (basic, variantType, variantData) => {
   return errors;
 };
 
-const compressToWebP = async (buffer, targetMax = 1.4 * 1024 * 1024) => {
-  let out = await sharp(buffer).webp({ quality: 80 }).toBuffer();
-  let quality = 70;
-  while (out.length > targetMax && quality >= 40) {
-    out = await sharp(buffer)
-      .webp({ quality })
-      .toBuffer()
-      .catch(() => out);
-    quality -= 10;
-  }
-
-  if (out.length > targetMax) {
-    let width =
-      (
-        await sharp(buffer)
-          .metadata()
-          .catch(() => ({}))
-      ).width || null;
-    let factor = 0.9;
-    while (out.length > targetMax && factor > 0.3 && width) {
-      out = await sharp(buffer)
-        .resize(Math.round(width * factor))
-        .webp({ quality: 60 })
-        .toBuffer()
-        .catch(() => out);
-      factor -= 0.1;
-    }
-  }
-
-  if (out.length > targetMax)
-    throw new Error("Cannot compress image under 1.4MB");
-  return out;
-};
-
 // Map location distribution
 const mapLocations = (dist) =>
   (dist || [])
     .filter((ld) => ld.locationId)
     .map((ld) => ({ branch: ld.locationId, stock: Number(ld.stock) || 0 }));
 
+/**
+ * Move temp image to permanent folder
+ * @param {Object} imageObj - {url, publicId}
+ * @returns {Promise<Object>} - {url, publicId} with new location
+ */
+const moveImageToPermanent = async (imageObj) => {
+  if (!imageObj || !imageObj.publicId) return null;
+  
+  // If already in permanent folder, return as-is
+  if (!imageObj.publicId.startsWith("temp/")) {
+    return imageObj;
+  }
+
+  const moveResult = await moveImageFromTemp(imageObj.publicId, "products");
+  if (!moveResult.success) {
+    throw new Error(`Failed to move image: ${moveResult.message}`);
+  }
+
+  return {
+    url: moveResult.file.url,
+    publicId: moveResult.file.publicId,
+  };
+};
+
+/**
+ * Process image array - move from temp to permanent
+ * @param {Array} images - Array of {url, publicId} objects
+ * @returns {Promise<Array>}
+ */
+const processImages = async (images) => {
+  if (!Array.isArray(images) || images.length === 0) return [];
+  
+  const movedImages = await Promise.all(
+    images.map(async (img) => {
+      try {
+        return await moveImageToPermanent(img);
+      } catch (err) {
+        console.error("Error moving image:", err);
+        return null;
+      }
+    })
+  );
+
+  return movedImages.filter(Boolean);
+};
+
 // ---------- Route ----------
 
-router.post("/", upload.any(), async (req, res) => {
+router.post("/", async (req, res) => {
+  const movedImages = []; // Track moved images for rollback
+  
   try {
-    // Parse JSON fields
-    const body = Object.fromEntries(
-      Object.entries(req.body).map(([k, v]) => {
-        try {
-          return [k, JSON.parse(v)];
-        } catch {
-          return [k, v];
-        }
-      })
-    );
-
+    // Parse request body
+    const body = req.body;
+    
     const basic = body.basicInfo || {};
     const variantType = body.variantType || "none";
     const variantData =
@@ -150,6 +154,16 @@ router.post("/", upload.any(), async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Validation failed", errors });
+
+    // Move display image from temp to permanent
+    let displayImageUrl = null;
+    if (basic.displayImage && basic.displayImage.publicId) {
+      const movedDisplayImage = await moveImageToPermanent(basic.displayImage);
+      if (movedDisplayImage) {
+        displayImageUrl = movedDisplayImage.url;
+        movedImages.push(movedDisplayImage.publicId);
+      }
+    }
 
     // Base product data
     const productData = {
@@ -171,7 +185,7 @@ router.post("/", upload.any(), async (req, res) => {
         : [basic.brand].filter(Boolean),
       isActive: basic.isActive ?? true,
       isPublic: basic.isPublic ?? true,
-      displayImage: null,
+      displayImage: displayImageUrl,
       productVariant: {
         variantType,
         defaultCurrency: basic.defaultCurrency || { symbol: "Rs" },
@@ -184,29 +198,14 @@ router.post("/", upload.any(), async (req, res) => {
       },
     };
 
-    // ---------- Handle variants ----------
-    const handleVariantImages = async (variantImages, type) => {
-      if (!variantImages?.length) return [];
-      const uploaded = await Promise.all(
-        variantImages.map(async (file) => {
-          if (!file.mimetype.startsWith("image/"))
-            throw new Error(`Only images allowed: ${file.originalname}`);
-          if (file.size > 5 * 1024 * 1024)
-            throw new Error(`File too large: ${file.originalname}`);
-          const buf = await compressToWebP(file.buffer);
-          const result = await uploadBufferToCloudinary(buf, "products");
-          return {
-            url: result.file?.url || result.file?.secure_url,
-            publicId: result.file?.publicId || result.file?.public_id,
-          };
-        })
-      );
-      return uploaded;
-    };
-
-    // Map variants
+    // ---------- Handle variants and move images ----------
     if (variantType === "none") {
       const none = variantData;
+      
+      // Move images from temp to permanent
+      const noneImages = await processImages(none.images || []);
+      noneImages.forEach(img => movedImages.push(img.publicId));
+
       productData.productVariant.nonVariant = {
         locationDistribution: mapLocations(none.locationDistribution),
         totalStock: mapLocations(none.locationDistribution).reduce(
@@ -214,79 +213,63 @@ router.post("/", upload.any(), async (req, res) => {
           0
         ),
         sold: Number(none.sold) || 0,
-        images: [],
+        images: noneImages,
         purchasePricePerUnit: Number(none.purchasePricePerUnit) || 0,
         basePricePerUnit: Number(none.basePricePerUnit) || 0,
         salePricePerUnit: Number(none.salePricePerUnit) || 0,
       };
     } else if (variantType === "size") {
-      productData.productVariant.sizeVariants = (variantData || []).map(
-        (size) => ({
-          sizeName: size.sizeName?.trim() || "",
-          abbreviation: size.abbreviation?.trim() || "",
-          images: [],
-          colors: (size.colors || []).map((color) => ({
-            colorName: color.colorName?.trim() || "",
-            locationDistribution: mapLocations(color.locationDistribution),
-            totalStock: mapLocations(color.locationDistribution).reduce(
-              (sum, ld) => sum + ld.stock,
-              0
-            ),
-            sold: 0,
-            purchasePricePerUnit: Number(color.purchasePricePerUnit) || 0,
-            basePricePerUnit: Number(color.basePricePerUnit) || 0,
-            salePricePerUnit: Number(color.salePricePerUnit) || 0,
-          })),
+      productData.productVariant.sizeVariants = await Promise.all(
+        (variantData || []).map(async (size) => {
+          // Move size images from temp to permanent
+          const sizeImages = await processImages(size.images || []);
+          sizeImages.forEach(img => movedImages.push(img.publicId));
+
+          return {
+            sizeName: size.sizeName?.trim() || "",
+            abbreviation: size.abbreviation?.trim() || "",
+            images: sizeImages,
+            colors: (size.colors || []).map((color) => ({
+              colorName: color.colorName?.trim() || "",
+              locationDistribution: mapLocations(color.locationDistribution),
+              totalStock: mapLocations(color.locationDistribution).reduce(
+                (sum, ld) => sum + ld.stock,
+                0
+              ),
+              sold: 0,
+              purchasePricePerUnit: Number(color.purchasePricePerUnit) || 0,
+              basePricePerUnit: Number(color.basePricePerUnit) || 0,
+              salePricePerUnit: Number(color.salePricePerUnit) || 0,
+            })),
+          };
         })
       );
     } else if (variantType === "color") {
-      productData.productVariant.colorVariants = (variantData || []).map(
-        (color) => ({
-          colorName: color.colorName?.trim() || "",
-          images: [],
-          sizes: (color.sizes || []).map((size) => ({
-            sizeName: size.sizeName?.trim() || "",
-            abbreviation: size.abbreviation?.trim() || "",
-            locationDistribution: mapLocations(size.locationDistribution),
-            totalStock: mapLocations(size.locationDistribution).reduce(
-              (sum, ld) => sum + ld.stock,
-              0
-            ),
-            sold: 0,
-            purchasePricePerUnit: Number(size.purchasePricePerUnit) || 0,
-            basePricePerUnit: Number(size.basePricePerUnit) || 0,
-            salePricePerUnit: Number(size.salePricePerUnit) || 0,
-          })),
+      productData.productVariant.colorVariants = await Promise.all(
+        (variantData || []).map(async (color) => {
+          // Move color images from temp to permanent
+          const colorImages = await processImages(color.images || []);
+          colorImages.forEach(img => movedImages.push(img.publicId));
+
+          return {
+            colorName: color.colorName?.trim() || "",
+            images: colorImages,
+            sizes: (color.sizes || []).map((size) => ({
+              sizeName: size.sizeName?.trim() || "",
+              abbreviation: size.abbreviation?.trim() || "",
+              locationDistribution: mapLocations(size.locationDistribution),
+              totalStock: mapLocations(size.locationDistribution).reduce(
+                (sum, ld) => sum + ld.stock,
+                0
+              ),
+              sold: 0,
+              purchasePricePerUnit: Number(size.purchasePricePerUnit) || 0,
+              basePricePerUnit: Number(size.basePricePerUnit) || 0,
+              salePricePerUnit: Number(size.salePricePerUnit) || 0,
+            })),
+          };
         })
       );
-    }
-
-    // ---------- Handle file uploads ----------
-    if (req.files?.length) {
-      const uploadedFiles = await handleVariantImages(req.files);
-
-      uploadedFiles.forEach((file, i) => {
-        const field = req.files[i].fieldname;
-        if (!file?.url) return;
-        const fileObj = { url: file.url, publicId: file.publicId };
-
-        if (field === "displayImage") productData.displayImage = fileObj.url;
-        else if (variantType === "none" && field.startsWith("noneVariant_"))
-          productData.productVariant.nonVariant.images.push(fileObj);
-        else if (variantType === "size") {
-          const match = field.match(/^sizeVariant_(\d+)_image_/);
-          if (match)
-            productData.productVariant.sizeVariants[
-              parseInt(match[1])
-            ].images.push(fileObj);
-        } else if (variantType === "color") {
-          const match = field.match(/^colorVariant_(\d+)_image_/);
-          if (match)
-            productData.productVariant.colorVariants[
-              parseInt(match[1])
-            ].images.push(fileObj);
-        }
-      });
     }
 
     // ---------- Save product ----------
@@ -302,6 +285,19 @@ router.post("/", upload.any(), async (req, res) => {
     });
   } catch (err) {
     console.error("Error creating product:", err);
+    
+    // Rollback: Delete moved images on error
+    if (movedImages.length > 0) {
+      console.log("Rolling back moved images:", movedImages);
+      try {
+        await Promise.all(
+          movedImages.map(publicId => deleteFromCloudinary(publicId))
+        );
+      } catch (rollbackErr) {
+        console.error("Error during rollback:", rollbackErr);
+      }
+    }
+
     if (err.name === "ValidationError") {
       return res
         .status(400)

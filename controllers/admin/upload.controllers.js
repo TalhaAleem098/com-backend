@@ -33,7 +33,14 @@ const uploadImage = async (req, res) => {
         .toBuffer();
     }
 
-    const uploadResult = await uploadBufferToCloudinary(imageBuffer, "products");
+    // Upload to temp folder with context metadata for cleanup
+    const uploadResult = await uploadBufferToCloudinary(imageBuffer, "temp/products", {
+      context: {
+        uploaded_at: new Date().toISOString(),
+        type: "temporary"
+      },
+      tags: ["temp", "product-upload"]
+    });
 
     if (!uploadResult.success) {
       return res.status(500).json({
