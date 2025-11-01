@@ -42,4 +42,25 @@ const uploadBufferToCloudinary = (buffer, folder = "uploads") => {
   });
 };
 
-module.exports = { uploadToCloudinary, uploadBufferToCloudinary };
+const deleteFromCloudinary = async (publicId) => {
+  try {
+    const result = await cloudinary.uploader.destroy(publicId);
+    if (result.result === "ok" || result.result === "not found") {
+      return {
+        success: true,
+        message: result.result === "ok" ? "Image deleted successfully" : "Image not found",
+      };
+    }
+    return {
+      success: false,
+      message: "Failed to delete image",
+    };
+  } catch (err) {
+    return {
+      success: false,
+      message: err.message || "Delete failed",
+    };
+  }
+};
+
+module.exports = { uploadToCloudinary, uploadBufferToCloudinary, deleteFromCloudinary };

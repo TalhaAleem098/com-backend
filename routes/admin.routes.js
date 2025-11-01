@@ -7,5 +7,6 @@ router.use(authMiddleware);
 router.use("/products", require("./admin/products.route"))
 router.use("/brand-category", require("./admin/brandCategory.route"))
 router.use("/branches", require("./admin/branches.route"))
+router.use("/upload", require("./admin/upload.route"))
 
 module.exports = router;
