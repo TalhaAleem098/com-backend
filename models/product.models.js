@@ -101,7 +101,6 @@ productSchema.post('save', async function(doc) {
       }
     }
 
-    // Update brands
     if (doc.brand && doc.brand.length > 0) {
       const Brand = mongoose.model('Brand');
 
@@ -121,7 +120,6 @@ productSchema.post('save', async function(doc) {
       }
     }
 
-    // Update branch stock
     if (doc.productVariant) {
       const Branch = mongoose.model('Branch');
       const branchStockMap = new Map();

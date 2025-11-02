@@ -1,15 +1,29 @@
 const Product = require("@/models/product.models");
 
-async function getAllProducts(page = 1, limit = 10, filters = {}) {
+async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = null, dataType = "full") {
   try {
     const skip = (page - 1) * limit;
     const query = { isDeleted: false, ...filters };
 
+    if (searchTerm && typeof searchTerm === "string" && searchTerm.trim()) {
+      const searchRegex = new RegExp(searchTerm.trim(), "i");
+      query.$or = [
+        { name: searchRegex },
+        { sku: searchRegex },
+        { tags: searchRegex },
+        { description: searchRegex }
+      ];
+    }
+
+    const selectFields = dataType === "partial" 
+      ? "name description displayImage minStockToMaintain sku isActive isPublic productVariant category brand createdAt updatedAt"
+      : "";
+
     const [products, total] = await Promise.all([
       Product.find(query)
-        .select("name description displayImage minStockToMaintain sku isActive isPublic productVariant category brand createdAt updatedAt")
-        .populate("category", "name")
-        .populate("brand", "name")
+        .select(selectFields)
+        .populate("category", dataType === "partial" ? "name" : "")
+        .populate("brand", dataType === "partial" ? "name" : "")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
@@ -18,6 +32,10 @@ async function getAllProducts(page = 1, limit = 10, filters = {}) {
     ]);
 
     const formattedProducts = products.map(product => {
+      if (dataType === "full") {
+        return product;
+      }
+
       let totalStock = 0;
       let variants = [];
 
@@ -119,42 +137,6 @@ async function getAllProducts(page = 1, limit = 10, filters = {}) {
   }
 }
 
-async function searchProducts(searchTerm, limit = 15) {
-  try {
-    if (!searchTerm || typeof searchTerm !== "string") {
-      return { products: [] };
-    }
-
-    const searchRegex = new RegExp(searchTerm.trim(), "i");
-
-    const products = await Product.find({
-      isDeleted: false,
-      $or: [
-        { name: searchRegex },
-        { sku: searchRegex },
-        { tags: searchRegex },
-        { description: searchRegex }
-      ]
-    })
-      .select("name displayImage sku")
-      .limit(limit)
-      .sort({ name: 1 })
-      .lean();
-
-    return {
-      products: products.map(p => ({
-        _id: p._id,
-        name: p.name,
-        displayImage: p.displayImage,
-        sku: p.sku
-      }))
-    };
-  } catch (error) {
-    throw error;
-  }
-}
-
 module.exports = {
-  getAllProducts,
-  searchProducts
+  getAllProducts
 };
