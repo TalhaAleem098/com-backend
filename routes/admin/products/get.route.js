@@ -7,6 +7,11 @@ router.get("/", async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const dataType = req.query.data === "partial" ? "partial" : "full";
     const searchTerm = req.query.q || req.query.search || req.query.query || null;
+    const status = req.query.status || "active";
+    
+    if(status && !["active", "archived", "deleted"].includes(status)) {
+      status = "active";
+    }
     
     const filters = {};
 
@@ -26,7 +31,7 @@ router.get("/", async (req, res) => {
       filters.brand = req.query.brand;
     }
 
-    const result = await getAllProducts(page, limit, filters, searchTerm, dataType);
+    const result = await getAllProducts(page, limit, filters, searchTerm, dataType, status);
     res.status(200).json(result);
   } catch (err) {
     res.status(500).json({ message: "Internal server error" });

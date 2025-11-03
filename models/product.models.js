@@ -58,6 +58,11 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+    status: {
+      type: String,
+      enum: ["active", "archived", "deleted"],
+      default: "active",
+    },
     isDeleted: {
       type: Boolean,
       default: false,
@@ -221,9 +226,9 @@ productSchema.post('save', async function(doc) {
   }
 });
 
-// Middleware to handle product deletion
+// Middleware to handle product deletion or archival
 productSchema.post('findOneAndUpdate', async function(doc) {
-  if (doc && this.getUpdate()?.isDeleted === true) {
+  if (doc && (this.getUpdate()?.isDeleted === true || this.getUpdate()?.status === 'deleted' || this.getUpdate()?.status === 'archived')) {
     try {
       if (doc.category && doc.category.length > 0) {
         const Category = mongoose.model('Category');

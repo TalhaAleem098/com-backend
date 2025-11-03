@@ -1,9 +1,15 @@
 const Product = require("@/models/product.models");
 
-async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = null, dataType = "full") {
+async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = null, dataType = "full", status = "active") {
   try {
     const skip = (page - 1) * limit;
-    const query = { isDeleted: false, ...filters };
+    const query = { ...filters };
+
+    if (status && ["active", "archived", "deleted"].includes(status)) {
+      query.status = status;
+    } else {
+      query.status = "active";
+    }
 
     if (searchTerm && typeof searchTerm === "string" && searchTerm.trim()) {
       const searchRegex = new RegExp(searchTerm.trim(), "i");
