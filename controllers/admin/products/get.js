@@ -1,6 +1,62 @@
 const Product = require("@/models/product.models");
 
-async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = null, dataType = "full", status = "active") {
+function calculateTotalStock(product) {
+  let totalStock = 0;
+  
+  if (!product.productVariant) return 0;
+
+  if (product.productVariant.variantType === "none") {
+    const nv = product.productVariant.nonVariant;
+    if (nv?.locationDistribution && Array.isArray(nv.locationDistribution)) {
+      nv.locationDistribution.forEach(loc => {
+        totalStock += loc.stock || 0;
+      });
+    }
+  } else if (product.productVariant.variantType === "size") {
+    product.productVariant.sizeVariants?.forEach(size => {
+      if (size.colors && Array.isArray(size.colors)) {
+        size.colors.forEach(color => {
+          if (color.locationDistribution && Array.isArray(color.locationDistribution)) {
+            color.locationDistribution.forEach(loc => {
+              totalStock += loc.stock || 0;
+            });
+          }
+        });
+      }
+    });
+  } else if (product.productVariant.variantType === "color") {
+    product.productVariant.colorVariants?.forEach(color => {
+      if (color.sizes && Array.isArray(color.sizes)) {
+        color.sizes.forEach(size => {
+          if (size.locationDistribution && Array.isArray(size.locationDistribution)) {
+            size.locationDistribution.forEach(loc => {
+              totalStock += loc.stock || 0;
+            });
+          }
+        });
+      }
+    });
+  }
+
+  return totalStock;
+}
+
+function getStockStatus(totalStock, minStockToMaintain = 0) {
+  if (totalStock === 0) return "outofstock";
+  if (totalStock <= minStockToMaintain) return "lowstock";
+  return "instock";
+}
+
+function getDaysUntilDeletion(deletedAt) {
+  if (!deletedAt) return null;
+  const now = new Date();
+  const deleted = new Date(deletedAt);
+  const daysPassed = Math.floor((now - deleted) / (1000 * 60 * 60 * 24));
+  const daysRemaining = 30 - daysPassed;
+  return daysRemaining > 0 ? daysRemaining : 0;
+}
+
+async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = null, dataType = "full", status = "active", stockFilter = null) {
   try {
     const skip = (page - 1) * limit;
     const query = { ...filters };
@@ -9,6 +65,12 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
       query.status = status;
     } else {
       query.status = "active";
+    }
+
+    if (status === "deleted") {
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+      query.deletedAt = { $gte: thirtyDaysAgo };
     }
 
     if (searchTerm && typeof searchTerm === "string" && searchTerm.trim()) {
@@ -22,28 +84,44 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
     }
 
     const selectFields = dataType === "partial" 
-      ? "name description displayImage minStockToMaintain sku isActive isPublic productVariant category brand createdAt updatedAt"
+      ? "name description displayImage minStockToMaintain sku isActive isPublic status productVariant category brand createdAt updatedAt deletedAt"
       : "";
 
-    const [products, total] = await Promise.all([
-      Product.find(query)
-        .select(selectFields)
-        .populate("category", dataType === "partial" ? "name" : "")
-        .populate("brand", dataType === "partial" ? "name" : "")
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      Product.countDocuments(query)
-    ]);
+    let allProducts = await Product.find(query)
+      .select(selectFields)
+      .populate("category", dataType === "partial" ? "name" : "")
+      .populate("brand", dataType === "partial" ? "name" : "")
+      .sort({ createdAt: -1 })
+      .lean();
+
+    if (stockFilter && ["instock", "lowstock", "outofstock"].includes(stockFilter)) {
+      allProducts = allProducts.filter(product => {
+        const totalStock = calculateTotalStock(product);
+        const stockStatus = getStockStatus(totalStock, product.minStockToMaintain);
+        return stockStatus === stockFilter;
+      });
+    }
+
+    const total = allProducts.length;
+    const products = allProducts.slice(skip, skip + limit);
 
     const formattedProducts = products.map(product => {
       if (dataType === "full") {
-        return product;
+        const totalStock = calculateTotalStock(product);
+        const stockStatus = getStockStatus(totalStock, product.minStockToMaintain);
+        
+        return {
+          ...product,
+          totalStock,
+          stockStatus,
+          daysUntilDeletion: product.status === "deleted" ? getDaysUntilDeletion(product.deletedAt) : null
+        };
       }
 
       let totalStock = 0;
       let variants = [];
+      let hasInStock = false;
+      let hasOutOfStock = false;
 
       if (product.productVariant?.variantType === "none") {
         const nv = product.productVariant.nonVariant;
@@ -56,6 +134,9 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
         }
         
         totalStock = noneStock;
+        hasInStock = noneStock > 0;
+        hasOutOfStock = noneStock === 0;
+        
         variants = [{
           type: "none",
           stock: noneStock
@@ -73,6 +154,10 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
               }
               
               totalStock += colorStock;
+              
+              if (colorStock > 0) hasInStock = true;
+              if (colorStock === 0) hasOutOfStock = true;
+              
               variants.push({
                 type: "size-color",
                 sizeName: size.sizeName,
@@ -96,6 +181,10 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
               }
               
               totalStock += sizeStock;
+              
+              if (sizeStock > 0) hasInStock = true;
+              if (sizeStock === 0) hasOutOfStock = true;
+              
               variants.push({
                 type: "color-size",
                 colorName: color.colorName,
@@ -108,6 +197,8 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
         });
       }
 
+      const stockStatus = getStockStatus(totalStock, product.minStockToMaintain);
+
       return {
         _id: product._id,
         name: product.name,
@@ -116,14 +207,19 @@ async function getAllProducts(page = 1, limit = 10, filters = {}, searchTerm = n
         sku: product.sku,
         isActive: product.isActive,
         isPublic: product.isPublic,
+        status: product.status,
         variantType: product.productVariant?.variantType,
         minStockToMaintain: product.minStockToMaintain,
         totalStock,
+        stockStatus,
+        hasInStock,
+        hasOutOfStock,
         variants,
         category: product.category,
         brand: product.brand,
         createdAt: product.createdAt,
-        updatedAt: product.updatedAt
+        updatedAt: product.updatedAt,
+        daysUntilDeletion: product.status === "deleted" ? getDaysUntilDeletion(product.deletedAt) : null
       };
     });
 

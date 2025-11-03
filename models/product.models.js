@@ -67,6 +67,10 @@ const productSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
     displayImage: {
       type: String,
       default: null,
@@ -226,7 +230,19 @@ productSchema.post('save', async function(doc) {
   }
 });
 
-// Middleware to handle product deletion or archival
+productSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update && (update.status === 'deleted' || update.isDeleted === true)) {
+    if (!update.deletedAt && !update.$set?.deletedAt) {
+      this.set({ deletedAt: new Date() });
+    }
+  }
+  if (update && update.status === 'active') {
+    this.set({ deletedAt: null });
+  }
+  next();
+});
+
 productSchema.post('findOneAndUpdate', async function(doc) {
   if (doc && (this.getUpdate()?.isDeleted === true || this.getUpdate()?.status === 'deleted' || this.getUpdate()?.status === 'archived')) {
     try {
