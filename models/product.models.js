@@ -66,6 +66,27 @@ const productSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    isFeatured: {
+      type: Boolean,
+      default: false,
+    },
+    linkedProducts: [
+      {
+        productId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Product",
+          required: true,
+        },
+        name: {
+          type: String,
+          default: null,
+        },
+        image: {
+          type: String,
+          default: null,
+        },
+      },
+    ],
     commentSection: {
       totalRating: { type: Number, default: 0 },
       totalReviews: { type: Number, default: 0 },

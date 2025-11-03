@@ -32,7 +32,7 @@ const productVariantSchema = new mongoose.Schema(
         columns: [
           { 
             name: { type: String, default: null }, 
-            value: { type: Number, default: 0 } 
+            value: { type: mongoose.Schema.Types.Mixed, default: null } 
           },
         ],
       },

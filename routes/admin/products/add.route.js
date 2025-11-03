@@ -185,7 +185,17 @@ router.post("/", async (req, res) => {
         : [basic.brand].filter(Boolean),
       isActive: basic.isActive ?? true,
       isPublic: basic.isPublic ?? true,
+      isFeatured: basic.isFeatured ?? false,
       displayImage: displayImageUrl,
+      linkedProducts: Array.isArray(body.linkedProducts)
+        ? body.linkedProducts
+            .filter((lp) => lp && lp.productId)
+            .map((lp) => ({
+              productId: lp.productId,
+              name: lp.name || null,
+              image: lp.image || null,
+            }))
+        : [],
       productVariant: {
         variantType,
         defaultCurrency: basic.defaultCurrency || { symbol: "Rs" },

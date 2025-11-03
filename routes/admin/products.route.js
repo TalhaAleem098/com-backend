@@ -4,6 +4,8 @@ const { authMiddleware } = require("@/middlewares/auth.middlewares");
 router.use(authMiddleware);
 router.use("/add", require("./products/add.route"));
 router.use("/get", require("./products/get.route"));
+router.use("/update", require("./products/update.route"));
+router.use("/details", require("./products/getById.route"));
 router.use("/counter", require("./products/counter.route"));
 
 module.exports = router;
