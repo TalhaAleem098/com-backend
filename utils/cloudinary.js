@@ -45,21 +45,85 @@ const uploadBufferToCloudinary = (buffer, folder = "uploads", options = {}) => {
 
 const deleteFromCloudinary = async (publicId) => {
   try {
-    const result = await cloudinary.uploader.destroy(publicId);
-    if (result.result === "ok" || result.result === "not found") {
+    console.log("🗑️  [Cloudinary Delete] Starting deletion process");
+    console.log("📋 [Cloudinary Delete] Public ID:", publicId);
+    
+    if (!publicId || publicId.trim() === "") {
+      console.log("❌ [Cloudinary Delete] Empty or invalid public ID provided");
       return {
-        success: true,
-        message: result.result === "ok" ? "Image deleted successfully" : "Image not found",
+        success: false,
+        message: "Public ID is required and cannot be empty",
       };
     }
-    return {
-      success: false,
-      message: "Failed to delete image",
-    };
+
+    // Try to get resource info first to verify it exists
+    try {
+      console.log("� [Cloudinary Delete] Checking if resource exists...");
+      const resourceInfo = await cloudinary.api.resource(publicId, { resource_type: 'image' });
+      console.log("✅ [Cloudinary Delete] Resource found:", {
+        public_id: resourceInfo.public_id,
+        format: resourceInfo.format,
+        resource_type: resourceInfo.resource_type,
+        type: resourceInfo.type,
+        created_at: resourceInfo.created_at,
+      });
+    } catch (checkErr) {
+      console.log("⚠️  [Cloudinary Delete] Resource check failed:", checkErr.message);
+      if (checkErr.error && checkErr.error.http_code === 404) {
+        console.log("📭 [Cloudinary Delete] Resource does not exist");
+        return {
+          success: true,
+          message: "Image not found (already deleted or never existed)",
+          result: "not found",
+        };
+      }
+    }
+
+    console.log("�🔄 [Cloudinary Delete] Calling Cloudinary destroy API...");
+    
+    // Try different resource types if needed
+    const result = await cloudinary.uploader.destroy(publicId, {
+      invalidate: true,
+      resource_type: 'image',
+    });
+    
+    console.log("📊 [Cloudinary Delete] API Response:", JSON.stringify(result, null, 2));
+    console.log("📌 [Cloudinary Delete] Result status:", result.result);
+    
+    if (result.result === "ok") {
+      console.log("✅ [Cloudinary Delete] Image deleted successfully");
+      return {
+        success: true,
+        message: "Image deleted successfully",
+        result: result.result,
+      };
+    } else if (result.result === "not found") {
+      console.log("⚠️  [Cloudinary Delete] Image not found in Cloudinary");
+      return {
+        success: true,
+        message: "Image not found (already deleted or never existed)",
+        result: result.result,
+      };
+    } else {
+      console.log("❌ [Cloudinary Delete] Unexpected result:", result.result);
+      return {
+        success: false,
+        message: `Delete failed with result: ${result.result}`,
+        result: result.result,
+      };
+    }
   } catch (err) {
+    console.error("💥 [Cloudinary Delete] Error occurred:", err);
+    console.error("💥 [Cloudinary Delete] Error message:", err.message);
+    console.error("💥 [Cloudinary Delete] Error code:", err.error?.http_code);
+    console.error("💥 [Cloudinary Delete] Error details:", JSON.stringify(err.error, null, 2));
+    console.error("💥 [Cloudinary Delete] Error stack:", err.stack);
+    
     return {
       success: false,
       message: err.message || "Delete failed",
+      error: err.toString(),
+      errorDetails: err.error,
     };
   }
 };
@@ -178,6 +242,60 @@ const getTempImages = async (hoursOld = 24) => {
   }
 };
 
+/**
+ * Check if an image exists in Cloudinary
+ * @param {string} publicId - The public ID to check
+ * @returns {Promise<{success: boolean, exists: boolean, details?: object, message?: string}>}
+ */
+const checkImageExists = async (publicId) => {
+  try {
+    console.log("🔍 [Cloudinary Check] Checking if image exists:", publicId);
+    
+    const resourceInfo = await cloudinary.api.resource(publicId, { 
+      resource_type: 'image',
+      type: 'upload' 
+    });
+    
+    console.log("✅ [Cloudinary Check] Image exists:", {
+      public_id: resourceInfo.public_id,
+      format: resourceInfo.format,
+      url: resourceInfo.secure_url,
+      created_at: resourceInfo.created_at,
+    });
+    
+    return {
+      success: true,
+      exists: true,
+      details: {
+        publicId: resourceInfo.public_id,
+        format: resourceInfo.format,
+        url: resourceInfo.secure_url,
+        resourceType: resourceInfo.resource_type,
+        type: resourceInfo.type,
+        createdAt: resourceInfo.created_at,
+        bytes: resourceInfo.bytes,
+      },
+    };
+  } catch (err) {
+    console.log("❌ [Cloudinary Check] Error:", err.message);
+    
+    if (err.error && err.error.http_code === 404) {
+      console.log("📭 [Cloudinary Check] Image does not exist");
+      return {
+        success: true,
+        exists: false,
+        message: "Image not found",
+      };
+    }
+    
+    return {
+      success: false,
+      exists: false,
+      message: err.message || "Failed to check image",
+    };
+  }
+};
+
 module.exports = { 
   uploadToCloudinary, 
   uploadBufferToCloudinary, 
@@ -185,4 +303,5 @@ module.exports = {
   moveImageFromTemp,
   deleteManyFromCloudinary,
   getTempImages,
+  checkImageExists,
 };
