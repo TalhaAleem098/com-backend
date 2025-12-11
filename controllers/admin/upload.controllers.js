@@ -150,4 +150,88 @@ const checkImage = async (req, res) => {
   }
 };
 
-module.exports = { uploadImage, deleteImage, checkImage };
+const uploadVideoFile = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No video file provided" });
+    }
+
+    const fileSizeInMB = req.file.size / (1024 * 1024);
+
+    if (fileSizeInMB > 50) {
+      return res.status(400).json({ success: false, message: "Video size exceeds 50MB limit" });
+    }
+
+    const uploadResult = await uploadBufferToCloudinary(
+      req.file.buffer, 
+      "temp/videos",
+      { resource_type: "video" }
+    );
+
+    if (!uploadResult.success) {
+      return res.status(500).json({ 
+        success: false, 
+        message: uploadResult.message || "Failed to upload video to Cloudinary" 
+      });
+    }
+
+    return res.status(200).json({ 
+      success: true, 
+      data: { 
+        url: uploadResult.file.url, 
+        publicId: uploadResult.file.publicId 
+      } 
+    });
+  } catch (err) {
+    return res.status(500).json({ 
+      success: false, 
+      message: err.message || "Failed to process video" 
+    });
+  }
+};
+
+const deleteVideo = async (req, res) => {
+  try {
+    const { publicId } = req.body;
+
+    if (!publicId) {
+      return res.status(400).json({
+        success: false,
+        message: "Public ID is required",
+      });
+    }
+
+    const trimmedPublicId = publicId.trim();
+    
+    if (trimmedPublicId === "") {
+      return res.status(400).json({
+        success: false,
+        message: "Public ID cannot be empty",
+      });
+    }
+
+    const deleteResult = await deleteFromCloudinary(trimmedPublicId);
+
+    if (!deleteResult.success) {
+      return res.status(500).json({
+        success: false,
+        message: deleteResult.message || "Failed to delete video",
+        details: deleteResult,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: deleteResult.message,
+      result: deleteResult.result,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      success: false,
+      message: err.message || "Failed to delete video",
+      error: process.env.NODE_ENV === "development" ? err.toString() : undefined,
+    });
+  }
+};
+
+module.exports = { uploadImage, deleteImage, checkImage, uploadVideoFile, deleteVideo };

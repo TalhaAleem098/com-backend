@@ -132,27 +132,29 @@ const deleteFromCloudinary = async (publicId) => {
  * Move image from temp folder to permanent folder
  * @param {string} publicId - The public ID of the temp image
  * @param {string} newFolder - The destination folder (e.g., "products")
+ * @param {string} resourceType - The resource type (image or video)
  * @returns {Promise<{success: boolean, file?: {url: string, publicId: string}, message?: string}>}
  */
-const moveImageFromTemp = async (publicId, newFolder = "products") => {
+const moveImageFromTemp = async (publicId, newFolder = "products", resourceType = "image") => {
   try {
     if (!publicId) {
       return { success: false, message: "Public ID is required" };
     }
 
-    // Check if the image is in temp folder
+    // Check if the resource is in temp folder
     if (!publicId.startsWith("temp/")) {
-      return { success: false, message: "Image is not in temp folder" };
+      return { success: false, message: "Resource is not in temp folder" };
     }
 
     // Extract filename from publicId (e.g., "temp/products/abc123" -> "abc123")
     const filename = publicId.split("/").pop();
     const newPublicId = `${newFolder}/${filename}`;
 
-    // Rename (move) the image
+    // Rename (move) the resource
     const result = await cloudinary.uploader.rename(publicId, newPublicId, {
       overwrite: false,
       invalidate: true,
+      resource_type: resourceType,
     });
 
     return {
@@ -165,7 +167,7 @@ const moveImageFromTemp = async (publicId, newFolder = "products") => {
   } catch (err) {
     return {
       success: false,
-      message: err.message || "Failed to move image",
+      message: err.message || "Failed to move resource",
     };
   }
 };

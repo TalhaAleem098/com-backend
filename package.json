@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@tanstack/react-query-devtools": "^5.90.2",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.0",
     "cloudinary": "^2.7.0",

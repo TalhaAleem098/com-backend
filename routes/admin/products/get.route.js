@@ -2,7 +2,6 @@ const router = require("express").Router();
 const { getAllProducts } = require("@/controllers/admin/products/get");
 const Product = require("@/models/product.models");
 
-// Helper function to calculate total stock for a product
 function calculateProductStock(product) {
   let totalStock = 0;
   
@@ -44,7 +43,6 @@ function calculateProductStock(product) {
   return totalStock;
 }
 
-// Helper function to determine stock status
 function getProductStockStatus(totalStock, minStockToMaintain = 0) {
   if (totalStock === 0) return "outofstock";
   if (totalStock <= minStockToMaintain) return "lowstock";
@@ -156,6 +154,69 @@ router.get("/stats", async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: "Failed to fetch product statistics" 
+    });
+  }
+});
+
+router.get("/by-ids", async (req, res) => {
+  try {
+    const { ids } = req.query;
+
+    if (!ids) {
+      return res.status(400).json({
+        success: false,
+        message: "Product IDs are required",
+      });
+    }
+
+    let productIds = [];
+    if (typeof ids === "string") {
+      productIds = ids.includes(",") ? ids.split(",").map(id => id.trim()) : [ids.trim()];
+    } else if (Array.isArray(ids)) {
+      productIds = ids.map(id => id.trim());
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid IDs format",
+      });
+    }
+
+    if (productIds.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "At least one product ID is required",
+      });
+    }
+
+    const products = await Product.find({
+      _id: { $in: productIds },
+      status: "active",
+    })
+      .populate("category", "name")
+      .populate("brand", "name")
+      .lean();
+
+    const formattedProducts = products.map(product => {
+      const totalStock = calculateProductStock(product);
+      const stockStatus = getProductStockStatus(totalStock, product.minStockToMaintain);
+      
+      return {
+        ...product,
+        totalStock,
+        stockStatus,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: formattedProducts,
+      count: formattedProducts.length,
+    });
+  } catch (error) {
+    console.error("Error fetching products by IDs:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to fetch products",
     });
   }
 });
