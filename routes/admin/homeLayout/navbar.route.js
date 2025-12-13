@@ -41,6 +41,7 @@ router.get("/brand", authMiddleware, async (req, res) => {
       data: navbar.brand,
     });
   } catch (error) {
+    console.error("❌ [Navbar Route] Error fetching brand data:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -92,6 +93,7 @@ router.post("/brand", authMiddleware, async (req, res) => {
       data: navbar.brand,
     });
   } catch (error) {
+    console.error("❌ [Navbar Route] Error updating brand data:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -127,6 +129,7 @@ router.get("/links", authMiddleware, async (req, res) => {
       data: navbar.links,
     });
   } catch (error) {
+    console.error("❌ [Navbar Route] Error fetching links data:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
@@ -139,6 +142,7 @@ router.post("/links", authMiddleware, async (req, res) => {
     const { links } = req.body;
 
     if (!Array.isArray(links)) {
+      console.error("❌ [Navbar Route] Invalid links format:", links);
       return res.status(400).json({
         success: false,
         message: "Links must be an array",
@@ -147,6 +151,7 @@ router.post("/links", authMiddleware, async (req, res) => {
 
     for (const link of links) {
       if (!link.name || !link.type) {
+        console.log("❌ [Navbar Route] Missing name or type in link:", link);
         return res.status(400).json({
           success: false,
           message: "Each link must have name and type",
@@ -154,6 +159,7 @@ router.post("/links", authMiddleware, async (req, res) => {
       }
 
       if (!["url", "query"].includes(link.type)) {
+        console.log("❌ [Navbar Route] Invalid link type:", link.type);
         return res.status(400).json({
           success: false,
           message: "Link type must be either url or query",
@@ -161,6 +167,7 @@ router.post("/links", authMiddleware, async (req, res) => {
       }
 
       if (link.type === "url" && !link.url) {
+        console.log("❌ [Navbar Route] Missing URL in url-type link:", link);
         return res.status(400).json({
           success: false,
           message: "URL-based links must have a url field",
@@ -168,6 +175,7 @@ router.post("/links", authMiddleware, async (req, res) => {
       }
 
       if (link.type === "query" && (!link.dropdown || !Array.isArray(link.dropdown) || link.dropdown.length === 0)) {
+        console.log("❌ [Navbar Route] Invalid dropdown in query-type link:", link);
         return res.status(400).json({
           success: false,
           message: "Query-based links must have dropdown array with at least one option",
@@ -175,6 +183,7 @@ router.post("/links", authMiddleware, async (req, res) => {
       }
 
       if (link.type === "query" && link.dropdown) {
+        console.log("🔍 [Navbar Route] Validating dropdown options for link:", link.name);
         for (const option of link.dropdown) {
           if (!option.name) {
             return res.status(400).json({
@@ -216,6 +225,7 @@ router.post("/links", authMiddleware, async (req, res) => {
       data: navbar.links,
     });
   } catch (error) {
+    console.error("❌ [Navbar Route] Error updating links data:", error);
     return res.status(500).json({
       success: false,
       message: error.message,
