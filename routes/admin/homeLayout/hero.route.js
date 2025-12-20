@@ -47,6 +47,8 @@ router.post("/", authMiddleware, async (req, res) => {
   try {
     const { slides, config } = req.body;
 
+    console.log("📦 [Hero Route] Received request body:", JSON.stringify(req.body, null, 2));
+
     if (slides && !Array.isArray(slides)) {
       return res.status(400).json({
         success: false,
@@ -56,8 +58,22 @@ router.post("/", authMiddleware, async (req, res) => {
 
     let processedSlides = [];
     if (slides && Array.isArray(slides)) {
+      console.log(`🎨 [Hero Route] Processing ${slides.length} slide(s)`);
+      
       processedSlides = await Promise.all(
-        slides.map(async (slide) => {
+        slides.map(async (slide, index) => {
+          const gradientFrom = slide.gradient?.from && slide.gradient.from.trim() !== "" 
+            ? slide.gradient.from 
+            : "#000000";
+          const gradientTo = slide.gradient?.to && slide.gradient.to.trim() !== "" 
+            ? slide.gradient.to 
+            : "";
+          
+          console.log(`🎨 [Hero Route] Slide ${index + 1} gradient colors:`, {
+            from: gradientFrom,
+            to: gradientTo || "none"
+          });
+          
           const desktopImg = await moveImageToPermanent(slide.desktop);
           const mobileImg = await moveImageToPermanent(slide.mobile);
           return {
@@ -65,8 +81,8 @@ router.post("/", authMiddleware, async (req, res) => {
             mobile: mobileImg || { url: "", publicId: "" },
             clickLink: slide.clickLink || "",
             gradient: {
-              from: slide.gradient?.from || "",
-              to: slide.gradient?.to || "",
+              from: gradientFrom,
+              to: gradientTo,
             },
           };
         })

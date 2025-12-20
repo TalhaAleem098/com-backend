@@ -5,7 +5,6 @@ require("dotenv").config({ quiet: true });
 require("./config/db")();
 const { initializeCronJobs } = require("./utils/cron");
 
-// Initialize cron jobs for cleanup
 initializeCronJobs();
 
 app.use(require("./middlewares/main.js"));
@@ -15,7 +14,7 @@ app.use(require("./middlewares/main.js"));
 //   next();
 // })
 
-app.use("/api", require("./routes/api.route.js"));
+app.use("/api", require("./routes/api.routes.js"));
 
 app.use((req, res, next) => {
   const userIp = req.ip || req.connection.remoteAddress;
