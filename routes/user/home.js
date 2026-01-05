@@ -13,10 +13,9 @@ router.get("/navbar", async (req, res) => {
       data: navbar,
     });
   } catch (err) {
-    console.error("❌ [Home Fetch] Error fetching navbar data:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Something went wrong. Please try again later.",
     });
   }
 });
@@ -30,10 +29,9 @@ router.get("/hero", async (req, res) => {
       data: hero,
     });
   } catch (err) {
-    console.error("❌ [Home Fetch] Error fetching hero data:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Something went wrong. Please try again later.",
     });
   }
 });
@@ -47,33 +45,25 @@ router.get("/categories", async (req, res) => {
       data: categories,
     });
   } catch (err) {
-    console.error("❌ [Home Fetch] Error fetching categories data:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Something went wrong. Please try again later.",
     });
   }
 });
 
 router.get("/display-items", async (req, res) => {
   try {
-    const displayItems = await DisplayItemsModel.findOne().populate([
-      "nonFeatured.firstTwoRows.row1Products",
-      "nonFeatured.firstTwoRows.row2Products",
-      "nonFeatured.leftImageRightProducts.products",
-      "nonFeatured.rightImageLeftProducts.products",
-      "nonFeatured.extraFeaturedList.product",
-    ]);
+    const displayItems = await DisplayItemsModel.findOne();
     
     return res.status(200).json({
       success: true,
       data: displayItems,
     });
   } catch (err) {
-    console.error("❌ [Home Fetch] Error fetching display items data:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Something went wrong. Please try again later.",
     });
   }
 });
@@ -83,13 +73,7 @@ router.get("/", async (req, res) => {
     const navbar = await NavbarModel.findOne();
     const hero = await HeroModel.findOne();
     const categories = await CategoryModel.find();
-    const displayItems = await DisplayItemsModel.findOne().populate([
-      "nonFeatured.firstTwoRows.row1Products",
-      "nonFeatured.firstTwoRows.row2Products",
-      "nonFeatured.leftImageRightProducts.products",
-      "nonFeatured.rightImageLeftProducts.products",
-      "nonFeatured.extraFeaturedList.product",
-    ]);
+    const displayItems = await DisplayItemsModel.findOne();
 
     return res.status(200).json({
       success: true,
@@ -101,10 +85,9 @@ router.get("/", async (req, res) => {
       },
     });
   } catch (err) {
-    console.error("❌ [Home Fetch] Error fetching home layout data:", err);
     return res.status(500).json({
       success: false,
-      message: "Internal Server Error",
+      message: "Something went wrong. Please try again later.",
     });
   }
 });
