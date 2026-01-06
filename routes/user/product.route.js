@@ -2,9 +2,22 @@ const router = require("express").Router();
 const mongoose = require("mongoose");
 const Product = require("../../models/product.models");
 
+const sanitizeProduct = (obj) => {
+  if (typeof obj !== 'object' || obj === null) return obj;
+
+  const sanitized = Array.isArray(obj) ? [] : {};
+
+  for (const key in obj) {
+    if (key === 'purchasePricePerUnit' || key === 'basePricePerUnit') {
+      continue;
+    }
+    sanitized[key] = sanitizeProduct(obj[key]);
+  }
+
+  return sanitized;
+};
 
 router.get("/multiple", async (req, res) => {
-  console.log("Multiple route hit");
   try {
     const { ids } = req.query;
 
@@ -34,16 +47,18 @@ router.get("/multiple", async (req, res) => {
     })
       .populate("category", "name _id image")
       .populate("brand", "name _id logo")
-      .select(
-        "-createdAt -updatedAt -__v -isDeleted -deletedAt -linkedProducts -commentSection"
-      )
+      .select("-createdAt -updatedAt -__v -isDeleted -deletedAt -linkedProducts -commentSection")
       .lean();
+
+    // Sanitize each product
+    const sanitizedProducts = products.map(sanitizeProduct);
 
     return res.status(200).json({
       success: true,
-      data: products,
+      data: sanitizedProducts,
     });
   } catch (err) {
+    console.error("Error fetching multiple products:", err);
     return res.status(500).json({
       success: false,
       message: "Something went wrong. Please try again later.",
@@ -70,9 +85,7 @@ router.get("/:id", async (req, res) => {
     })
       .populate("category", "name _id image")
       .populate("brand", "name _id logo")
-      .select(
-        "-createdAt -updatedAt -__v -isDeleted -deletedAt -linkedProducts -commentSection"
-      )
+      .select("-createdAt -updatedAt -__v -isDeleted -deletedAt -linkedProducts -commentSection")
       .lean();
 
     if (!product) {
@@ -82,11 +95,15 @@ router.get("/:id", async (req, res) => {
       });
     }
 
+    // Sanitize the product
+    const sanitizedProduct = sanitizeProduct(product);
+
     return res.status(200).json({
       success: true,
-      data: product,
+      data: sanitizedProduct,
     });
   } catch (err) {
+    console.error("Error fetching product by ID:", err);
     return res.status(500).json({
       success: false,
       message: "Something went wrong. Please try again later.",
