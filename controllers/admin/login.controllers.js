@@ -233,7 +233,7 @@ const loginVerify = async (req, res, next) => {
 
     return res
       .status(200)
-      .json({ message: "Verification Successful!", success: true });
+      .json({ message: "Verification Successful!", success: true, accessToken, refreshToken });
   } catch (err) {
     next(err);
   }

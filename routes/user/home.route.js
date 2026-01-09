@@ -55,7 +55,7 @@ router.get("/categories", async (req, res) => {
 router.get("/display-items", async (req, res) => {
   try {
     const displayItems = await DisplayItemsModel.findOne();
-    
+    console.log(JSON.stringify(displayItems));
     return res.status(200).json({
       success: true,
       data: displayItems,

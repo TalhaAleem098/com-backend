@@ -5,6 +5,7 @@ require("dotenv").config({ quiet: true });
 require("./config/db")();
 const { initializeCronJobs } = require("./utils/cron");
 
+
 initializeCronJobs();
 
 app.use(require("./middlewares/main.js"));
