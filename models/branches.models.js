@@ -226,4 +226,5 @@ branchSchema.pre("findOneAndUpdate", async function (next) {
   next();
 });
 
-module.exports = mongoose.model("Branch", branchSchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("Branch", branchSchema);

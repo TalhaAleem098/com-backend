@@ -92,6 +92,7 @@ const NavbarSchema = new mongoose.Schema(
   }
 );
 
-const Navbar = mongoose.model("Navbar", NavbarSchema);
+const connection = mongoose.connection; // Default main database connection
+const Navbar = connection.model("Navbar", NavbarSchema);
 
 module.exports = Navbar;

@@ -27,4 +27,5 @@ const HeroSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model("Hero", HeroSchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("Hero", HeroSchema);

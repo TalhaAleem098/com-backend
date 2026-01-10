@@ -24,4 +24,5 @@ const categorySchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("HomeLayoutCategory", categorySchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("HomeLayoutCategory", categorySchema);

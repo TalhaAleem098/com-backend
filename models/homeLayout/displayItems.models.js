@@ -51,4 +51,5 @@ const displayItemSchema = new mongoose.Schema({
   },
 });
 
-module.exports = mongoose.model("DisplayItem", displayItemSchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("DisplayItem", displayItemSchema);

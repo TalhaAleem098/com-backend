@@ -337,6 +337,7 @@ productSchema.post('findOneAndUpdate', async function(doc) {
   }
 });
 
-const Product = mongoose.model("Product", productSchema);
+const connection = mongoose.connection; // Default main database connection
+const Product = connection.model("Product", productSchema);
 
 module.exports = Product;

@@ -73,6 +73,7 @@ categorySchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
-const Category = mongoose.model("Category", categorySchema);
+const connection = mongoose.connection; // Default main database connection
+const Category = connection.model("Category", categorySchema);
 
 module.exports = Category;

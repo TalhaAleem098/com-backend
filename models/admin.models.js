@@ -79,4 +79,5 @@ adminSchema.methods.matchPassword = async function (enteredPassword) {
   }
 };
 
-module.exports = mongoose.model("Admin", adminSchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("Admin", adminSchema);

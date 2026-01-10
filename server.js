@@ -2,9 +2,14 @@ const express = require("express");
 const app = express();
 require("module-alias/register");
 require("dotenv").config({ quiet: true });
-require("./config/db")();
+const { connectDB } = require("./config/db");
+connectDB();
 const { initializeCronJobs } = require("./utils/cron");
+const { createSocketServer } = require("./routes/sockets.route");
+const http = require("http");
 
+const httpServer = http.createServer(app);
+createSocketServer(httpServer);
 
 initializeCronJobs();
 
@@ -40,6 +45,6 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server is running on port ${PORT}`);
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });

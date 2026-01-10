@@ -36,6 +36,7 @@ brandSchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
-const Brand = mongoose.model("Brand", brandSchema);
+const connection = mongoose.connection; // Default main database connection
+const Brand = connection.model("Brand", brandSchema);
 
 module.exports = Brand;

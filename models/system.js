@@ -14,4 +14,5 @@ const alertSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Alerts", alertSchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("Alerts", alertSchema);

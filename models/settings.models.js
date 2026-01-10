@@ -119,4 +119,5 @@ const settingsSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model("Settings", settingsSchema);
+const connection = mongoose.connection; // Default main database connection
+module.exports = connection.model("Settings", settingsSchema);
