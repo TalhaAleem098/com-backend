@@ -67,7 +67,6 @@ const orderItemSchema = new mongoose.Schema({
   vendor: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Shop",
-    required: true,
   },
   selectedOptions: {
     color: {
