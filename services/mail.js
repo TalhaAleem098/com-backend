@@ -34,6 +34,7 @@ const sendMail = async (toOrOptions, subject, html) => {
     const info = await transporter.sendMail(mail);
     return { success: true, info };
   } catch (error) {
+    console.log('Mail send error:', error);
     return { success: false, error: error && error.message ? error.message : String(error) };
   }
 };
