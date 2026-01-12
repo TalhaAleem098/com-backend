@@ -4,7 +4,6 @@ const { authMiddleware } = require("@/middlewares/auth.middlewares");
 router.use("/auth", require("./admin/auth.route.js"))
 router.use("/home-layout", require("./admin/homeLayout.route"))
 
-
 router.use("/upload", require("./admin/upload.route"))
 
 router.use(authMiddleware);

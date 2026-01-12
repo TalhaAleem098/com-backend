@@ -66,7 +66,7 @@ const orderItemSchema = new mongoose.Schema({
   },
   vendor: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: "Shop",
+    ref: "Branch",
   },
   selectedOptions: {
     color: {
@@ -192,7 +192,6 @@ const orderSchema = new mongoose.Schema({
       },
       changedBy: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: "User",
       },
     },
   ],
