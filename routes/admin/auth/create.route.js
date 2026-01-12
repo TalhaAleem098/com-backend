@@ -1,6 +1,6 @@
 const router = require("express").Router();
 const Admin = require("@models/admin.models");
-const { Validate } = require("@utils/Validate");
+const { Validate } = require("@utils/validate");
 const { generateHash } = require("@utils/sha");
 const { encrypt } = require("@utils/aes");
 

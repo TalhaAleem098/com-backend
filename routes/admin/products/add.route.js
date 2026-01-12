@@ -4,7 +4,7 @@ const {
   moveImageFromTemp,
   deleteFromCloudinary,
 } = require("@/utils/cloudinary");
-const { v4: uuidv4 } = require("uuid");
+const { randomUUID } = require('crypto');
 const Product = require("@/models/product.models");
 const { registerRoute } = require("@/utils/register.routes");
 
@@ -13,7 +13,7 @@ const generateSKU = async () => {
   let sku,
     exists = true;
   while (exists) {
-    sku = uuidv4().replace(/-/g, "").substring(0, 6).toUpperCase();
+    sku = randomUUID().replace(/-/g, "").substring(0, 6).toUpperCase();
     exists = await Product.findOne({ sku });
   }
   return sku;
