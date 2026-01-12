@@ -2,6 +2,7 @@ const router = require("express").Router();
 const BrandModel = require("@/models/brand.models");
 const CategoryModel = require("@/models/category.models");
 const ProductModel = require("@/models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 // Delete brand
 router.delete('/brand/:id', async (req, res) => {
@@ -49,5 +50,8 @@ router.delete('/category/:id', async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 });
+
+registerRoute("delete", "/api/admin/brand-category/delete/brand/:id");
+registerRoute("delete", "/api/admin/brand-category/delete/category/:id");
 
 module.exports = router;

@@ -2,6 +2,7 @@ const router = require("express").Router();
 const DisplayItem = require("@/models/homeLayout/displayItems.models");
 const { authMiddleware } = require("@/middlewares/auth.middlewares");
 const { moveImageFromTemp } = require("@/utils/cloudinary");
+const { registerRoute } = require("@/utils/register.routes");
 
 const displayItemPopulatePaths = [
   "nonFeatured.firstTwoRows.row1Products",
@@ -166,5 +167,8 @@ router.post("/", authMiddleware, async (req, res) => {
     });
   }
 });
+
+registerRoute("get", "/api/admin/home-layout/display-items/");
+registerRoute("post", "/api/admin/home-layout/display-items/");
 
 module.exports = router;

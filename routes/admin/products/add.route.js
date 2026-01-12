@@ -6,6 +6,7 @@ const {
 } = require("@/utils/cloudinary");
 const { v4: uuidv4 } = require("uuid");
 const Product = require("@/models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 
 const generateSKU = async () => {
@@ -333,5 +334,7 @@ router.post("/", async (req, res) => {
       });
   }
 });
+
+registerRoute("post", "/api/admin/products/add/");
 
 module.exports = router;

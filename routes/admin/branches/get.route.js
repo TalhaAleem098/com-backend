@@ -1,4 +1,5 @@
 const router = require("express").Router();
+const { registerRoute } = require("@/utils/register.routes");
 const { getBranches } = require("../../../controllers/admin/branches/get");
 const Settings = require("../../../models/settings.models");
 const BranchModel = require("../../../models/branches.models");
@@ -214,5 +215,10 @@ router.get("/listing", async (req, res) => {
     return res.status(500).json({ message: "Something went wrong" });
   }
 });
+
+registerRoute("get", "/api/admin/branches/get/");
+registerRoute("get", "/api/admin/branches/get/search");
+registerRoute("get", "/api/admin/branches/get/one/:id");
+registerRoute("get", "/api/admin/branches/get/listing");
 
 module.exports = router;

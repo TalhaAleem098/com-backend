@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const BrandModel = require("@/models/brand.models");
 const CategoryModel = require("@/models/category.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 router.post("/brand", async (req, res) => {
   try {
@@ -86,5 +87,9 @@ router.post("/category/sub", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+registerRoute("post", "/api/admin/brand-category/add/brand");
+registerRoute("post", "/api/admin/brand-category/add/category");
+registerRoute("post", "/api/admin/brand-category/add/category/sub");
 
 module.exports = router;

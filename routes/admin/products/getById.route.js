@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const Product = require("@/models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 router.get("/:id", async (req, res) => {
   try {
@@ -43,5 +44,7 @@ router.get("/:id", async (req, res) => {
     });
   }
 });
+
+registerRoute("get", "/api/admin/products/details/:id");
 
 module.exports = router;

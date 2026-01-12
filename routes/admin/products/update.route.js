@@ -5,6 +5,7 @@ const {
   deleteFromCloudinary,
 } = require("@/utils/cloudinary");
 const Product = require("@/models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 /**
  * Move temp image to permanent folder
@@ -341,5 +342,7 @@ router.patch("/:id", async (req, res) => {
     });
   }
 });
+
+registerRoute("put", "/api/admin/products/update/:id");
 
 module.exports = router;

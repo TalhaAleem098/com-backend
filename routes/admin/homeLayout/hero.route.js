@@ -2,6 +2,7 @@ const router = require("express").Router();
 const Hero = require("@/models/homeLayout/hero.models");
 const { authMiddleware } = require("@/middlewares/auth.middlewares");
 const { moveImageFromTemp } = require("@/utils/cloudinary");
+const { registerRoute } = require("@/utils/register.routes");
 
 const moveImageToPermanent = async (imageObj, folder = "homeLayout/hero") => {
   if (!imageObj || !imageObj.publicId) return null;
@@ -111,5 +112,8 @@ router.post("/", authMiddleware, async (req, res) => {
     });
   }
 });
+
+registerRoute("get", "/api/admin/home-layout/hero/");
+registerRoute("post", "/api/admin/home-layout/hero/");
 
 module.exports = router;

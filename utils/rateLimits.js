@@ -11,7 +11,7 @@ const adminLoginLimit = rateLimit({
 
 const adminLimit = rateLimit({
   windowsMs: 1 * 60 * 1000,
-  max: 3,
+  max: 60,
   message: {
     success: false,
     message: "Too many clicks! Please try again later",

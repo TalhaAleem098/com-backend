@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const { getAllProducts } = require("@/controllers/admin/products/get");
 const Product = require("@/models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 function calculateProductStock(product) {
   let totalStock = 0;
@@ -267,5 +268,7 @@ router.get("/", async (req, res) => {
   }
 });
 
+
+registerRoute("get", "/api/admin/products/get/");
 
 module.exports = router;

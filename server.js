@@ -7,6 +7,7 @@ connectDB();
 const { initializeCronJobs } = require("./utils/cron");
 const { createSocketServer } = require("./routes/sockets.route");
 const http = require("http");
+const { getRegisteredRoutes } = require("./utils/register.routes");
 
 const httpServer = http.createServer(app);
 createSocketServer(httpServer);
@@ -20,75 +21,73 @@ app.use(require("./middlewares/main.js"));
 //   next();
 // })
 
-// Import API router separately for traversal
-const apiRouter = require("./routes/api.routes.js");
-app.use("/api", apiRouter);
+const apiRoutes = require("./routes/api.routes.js");
 
-app.get("/", (req, res) => {
-  res.send("Server is running...");
+const registeredRoutes = getRegisteredRoutes().map(route => {
+  const normalizedPath = route.path.replace(/\/$/, '');
+  const pattern = normalizedPath.replace(/:\w+/g, '[^/]+');
+  return { method: route.method.toUpperCase(), pattern: new RegExp(`^${pattern}$`), original: normalizedPath };
 });
 
-// Recursive function to log all routes including nested routers
-function logAllRoutes(router, basePath = "") {
-  if (!router || !router.stack) return;
+app.use((req, res, next) => {
+  const fullPath = req.originalUrl.split('?')[0]; 
+  const method = req.method;
+  const matched = registeredRoutes.find(r => r.method === method && r.pattern.test(fullPath));
+  if (matched) {
+    console.log(`Request: ${method} ${fullPath} -> Matched: ${matched.method} ${matched.original}`);
+  } else {
+    console.log(`Request: ${method} ${fullPath} -> Not registered`);
+  }
+  next();
+});
 
-  router.stack.forEach(layer => {
-    if (layer.route && layer.route.path) {
-      // Direct route
-      const fullPath = basePath + layer.route.path;
-      const methods = Object.keys(layer.route.methods).map(m => m.toUpperCase());
-      methods.forEach(method => {
-        console.log(`${method}  ${fullPath}`);
-      });
-    } else if (layer.name === "router" && layer.handle) {
-      // Nested router
-      let nestedBasePath = basePath;
+app.use("/api", apiRoutes);
 
-      if (layer.regexp && layer.regexp.source) {
-        // Convert regex to readable path
-        let match = layer.regexp.source
-          .replace("\\/?(?=\\/|$)", "")
-          .replace("^", "")
-          .replace("$", "")
-          .replace(/\(\?:\(\[\^\\\/]\+\?\)\)/g, ":id") // dynamic params
-          .replace(/\(\?:\(\[\^\\\/]\+\?\)\)/g, ":param")
-          .replace(/\\\//g, "/");
+app.use((req, res, next) => {
+  const userIp = req.ip || req.connection.remoteAddress;
+  req.userIp = userIp;
+  next();
+});
 
-        nestedBasePath += match;
-      }
-
-      if (layer.handle.stack) {
-        logAllRoutes(layer.handle, nestedBasePath);
-      }
-    }
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    message: "Route not found",
+    path: req.originalUrl,
   });
-}
+});
 
-// After all routes are mounted
-console.log("📌 All registered routes including nested:");
-logAllRoutes(app._router);       // top-level routes
-logAllRoutes(apiRouter, "/api"); // /api router and nested routers
+app.use((err, req, res, next) => {
+  console.error("Error:", err.stack);
+  res.status(err.status || 500).json({
+    success: false,
+    message: err.message || "Internal Server Error",
+  })
+});
 
-// app.use((req, res, next) => {
-//   const userIp = req.ip || req.connection.remoteAddress;
-//   req.userIp = userIp;
-//   next();
+// console.log("Registered Routes:");
+// const routes = getRegisteredRoutes();
+// const grouped = {};
+
+// routes.forEach((route) => {
+//   const parts = route.path.split('/').filter(p => p);
+//   const category = parts[1] || 'other';
+//   const subCategory = parts[2] || 'general';
+
+//   if (!grouped[category]) grouped[category] = {};
+//   if (!grouped[category][subCategory]) grouped[category][subCategory] = [];
+//   grouped[category][subCategory].push(route);
 // });
 
-// app.use((req, res, next) => {
-//   res.status(404).json({
-//     success: false,
-//     message: "Route not found",
-//     path: req.originalUrl,
+// Object.keys(grouped).sort().forEach((category) => {
+//   console.log(`\n${category.toUpperCase()}:`);
+//   Object.keys(grouped[category]).sort().forEach((sub) => {
+//     console.log(`  ${sub.charAt(0).toUpperCase() + sub.slice(1)}:`);
+//     grouped[category][sub].forEach((route) => {
+//       const normalizedPath = route.path.replace(/\/$/, '');
+//       console.log(`    ${route.method.toUpperCase()} ${normalizedPath}`);
+//     });
 //   });
-// });
-
-// app.use((err, req, res, next) => {
-//   console.error("Error:", err.stack);
-//   res.status(err.status || 500).json({
-//     success: false,
-//     message: err.message || "Internal Server Error",
-//   })
 // });
 
 const PORT = process.env.PORT || 3000;

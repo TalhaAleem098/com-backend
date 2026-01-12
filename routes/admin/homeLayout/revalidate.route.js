@@ -1,5 +1,6 @@
 const router = require("express").Router();
 // const fetch = require("node-fetch");
+const { registerRoute } = require("@/utils/register.routes");
 
 router.post("/", async (req, res) => {
   try {
@@ -49,5 +50,7 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
+registerRoute("post", "/api/admin/home-layout/revalidate/");
 
 module.exports = router;

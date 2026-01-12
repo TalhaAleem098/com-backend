@@ -102,8 +102,21 @@ const { generateToken, verifyToken } = require("@/utils/jwt");
 
 const authMiddleware = async (req, res, next) => {
   try {
-    const accessToken = req.cookies?.accessToken;
-    const refreshToken = req.cookies?.refreshToken;
+    let accessToken = req.cookies?.accessToken;
+    let refreshToken = req.cookies?.refreshToken;
+
+    // Check headers if cookies not available
+    if (!accessToken) {
+      const authHeader = req.headers.authorization;
+      if (authHeader && authHeader.startsWith('Bearer ')) {
+        accessToken = authHeader.substring(7);
+      }
+    }
+
+    if (!refreshToken) {
+      refreshToken = req.headers['x-refresh-token'];
+    }
+
     let decodedRefresh, decodedAccess;
     const commonCookieOptions = {
       httpOnly: true,
@@ -125,9 +138,10 @@ const authMiddleware = async (req, res, next) => {
         decodedAccess = verifyToken(accessToken);
 
         if (!decodedAccess.id || !decodedAccess.role) {
+          if (req.cookies?.accessToken) res.clearCookie("accessToken");
           return res.status(401).json({
             message: "Unauthorized Access!",
-            succes: false,
+            success: false,
           });
         }
         req.user = decodedAccess;
@@ -142,9 +156,9 @@ const authMiddleware = async (req, res, next) => {
         }
         return next();
       } catch (err) {
-        res.clearCookie("accessToken");
+        if (req.cookies?.accessToken) res.clearCookie("accessToken");
         console.log("Error in access verify: ", err);
-        if (err.name !== "TokenExpiryError" && !refreshToken) {
+        if (err.name !== "TokenExpiredError" && !refreshToken) {
           return res.status(401).json({
             message: "Invalid Tokens!",
             success: false,
@@ -166,8 +180,8 @@ const authMiddleware = async (req, res, next) => {
       decodedRefresh = verifyToken(refreshToken);
 
       if (!decodedRefresh.id || !decodedRefresh.role) {
-        res.clearCookie("refreshToken");
-        res.clearCookie("accessToken");
+        if (req.cookies?.refreshToken) res.clearCookie("refreshToken");
+        if (req.cookies?.accessToken) res.clearCookie("accessToken");
         throw new Error("Invalid refresh token payload");
       }
       const newAccessToken = generateToken(
@@ -176,10 +190,12 @@ const authMiddleware = async (req, res, next) => {
         60 * 60 * 1000 // 1 hour
       );
 
+      // Set cookie for new access token
       res.cookie("accessToken", newAccessToken, {
         ...commonCookieOptions,
         maxAge: 60 * 60 * 1000,
       });
+
       req.user = decodedRefresh;
       console.log("Request user: ", req.user);
       if (req.user.role !== "admin" && req.user.role !== "coadmin") {
@@ -192,8 +208,8 @@ const authMiddleware = async (req, res, next) => {
       return next();
     } catch (err) {
       console.log("Error in refresh verifying: ", err);
-      res.clearCookie("refreshToken");
-      res.clearCookie("accessToken");
+      if (req.cookies?.refreshToken) res.clearCookie("refreshToken");
+      if (req.cookies?.accessToken) res.clearCookie("accessToken");
       return res.status(401).json({
         message: "Invalid Tokens!",
         success: false,

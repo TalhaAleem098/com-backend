@@ -2,6 +2,7 @@ const router = require("express").Router();
 const Navbar = require("@/models/homeLayout/navbar.models");
 const { authMiddleware } = require("@/middlewares/auth.middlewares");
 const { moveImageFromTemp } = require("@/utils/cloudinary");
+const { registerRoute } = require("@/utils/register.routes");
 
 const moveImageToPermanent = async (imageObj, folder = "homeLayout/navbar") => {
   if (!imageObj || !imageObj.publicId) return null;
@@ -232,5 +233,10 @@ router.post("/links", authMiddleware, async (req, res) => {
     });
   }
 });
+
+registerRoute("get", "/api/admin/home-layout/navbar/brand");
+registerRoute("post", "/api/admin/home-layout/navbar/brand");
+registerRoute("get", "/api/admin/home-layout/navbar/links");
+registerRoute("post", "/api/admin/home-layout/navbar/links");
 
 module.exports = router;

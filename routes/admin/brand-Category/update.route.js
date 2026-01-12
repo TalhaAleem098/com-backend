@@ -2,6 +2,7 @@ const router = require("express").Router();
 const BrandModel = require("@/models/brand.models");
 const CategoryModel = require("@/models/category.models");
 const ProductModel = require("@/models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 // Update brand
 router.put("/brand/:id", async (req, res) => {
@@ -12,7 +13,6 @@ router.put("/brand/:id", async (req, res) => {
     const brand = await BrandModel.findById(id);
     if (!brand) return res.status(404).json({ message: "Brand not found" });
 
-    // If there are products linked, prevent renaming to a duplicate name but allow description update
     const hasProducts = (brand.items || []).length > 0;
 
     if (name && typeof name === 'string') {
@@ -22,7 +22,6 @@ router.put("/brand/:id", async (req, res) => {
       if (!hasProducts) {
         brand.name = normalized;
       } else {
-        // if linked to products, only allow case-insensitive same name
         if (brand.name !== normalized) {
           return res.status(400).json({ message: "Cannot change brand name while products are linked. Unlink products first." });
         }
@@ -38,7 +37,6 @@ router.put("/brand/:id", async (req, res) => {
   }
 });
 
-// Update category
 router.put("/category/:id", async (req, res) => {
   try {
     const id = req.params.id;
@@ -65,7 +63,6 @@ router.put("/category/:id", async (req, res) => {
     if (typeof description !== 'undefined') category.description = description;
 
     if (Array.isArray(subCategories)) {
-      // normalize and check duplicates
       const normalizedSubs = subCategories.map(s => String(s || '').trim().toLowerCase()).filter(Boolean);
       const unique = [...new Set(normalizedSubs)];
       if (unique.length !== normalizedSubs.length) {
@@ -80,5 +77,8 @@ router.put("/category/:id", async (req, res) => {
     res.status(500).json({ message: "Internal server error" });
   }
 });
+
+registerRoute("put", "/api/admin/brand-category/update/brand/:id");
+registerRoute("put", "/api/admin/brand-category/update/category/:id");
 
 module.exports = router;

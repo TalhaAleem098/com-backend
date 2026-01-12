@@ -54,7 +54,7 @@ module.exports = [
   credentials: true,
   optionsSuccessStatus: 200,
 }),
-  morgan("dev"),
+  // morgan("dev"),
   sessionMiddleware,
   cookieParser(),
 ];

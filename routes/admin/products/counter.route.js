@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const ProductModel = require("../../../models/product.models");
+const { registerRoute } = require("@/utils/register.routes");
 
 router.get("/", async (req, res) => {
   try {
@@ -11,5 +12,7 @@ router.get("/", async (req, res) => {
     res.status(500).json({ message: "Something went wrong" });
   }
 });
+
+registerRoute("get", "/api/admin/products/counter/");
 
 module.exports = router;

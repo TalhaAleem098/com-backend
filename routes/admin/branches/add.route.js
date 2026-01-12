@@ -1,5 +1,6 @@
 const Branches = require("@/models/branches.models");
 const router = require("express").Router();
+const { registerRoute } = require("@/utils/register.routes");
 
 const getByPath = (obj, path) =>
   path
@@ -116,5 +117,7 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ message: "Something went wrong" });
   }
 });
+
+registerRoute("post", "/api/admin/branches/add/");
 
 module.exports = router;
