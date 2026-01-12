@@ -1,8 +1,8 @@
 const routes = [];
-const { v4: uuidv4 } = require('uuid');
+const { randomUUID } = require('crypto');
 
 function registerRoute(method, path) {
-    const id = uuidv4();
+    const id = randomUUID();
     const route = {
         id,
         method: method.toUpperCase(),

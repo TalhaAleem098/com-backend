@@ -7,7 +7,7 @@ connectDB();
 const { initializeCronJobs } = require("./utils/cron");
 const { createSocketServer } = require("./routes/sockets.route");
 const http = require("http");
-const { getRegisteredRoutes } = require("./utils/register.routes");
+// const { getRegisteredRoutes } = require("./utils/register.routes");
 
 const httpServer = http.createServer(app);
 createSocketServer(httpServer);
@@ -22,24 +22,27 @@ app.use(require("./middlewares/main.js"));
 // })
 
 const apiRoutes = require("./routes/api.routes.js");
-
-const registeredRoutes = getRegisteredRoutes().map(route => {
-  const normalizedPath = route.path.replace(/\/$/, '');
-  const pattern = normalizedPath.replace(/:\w+/g, '[^/]+');
-  return { method: route.method.toUpperCase(), pattern: new RegExp(`^${pattern}$`), original: normalizedPath };
+app.get("/", (req, res) => {
+  res.send("Welcome to the Commerce Backend API");
 });
 
-app.use((req, res, next) => {
-  const fullPath = req.originalUrl.split('?')[0]; 
-  const method = req.method;
-  const matched = registeredRoutes.find(r => r.method === method && r.pattern.test(fullPath));
-  if (matched) {
-    console.log(`Request: ${method} ${fullPath} -> Matched: ${matched.method} ${matched.original}`);
-  } else {
-    console.log(`Request: ${method} ${fullPath} -> Not registered`);
-  }
-  next();
-});
+// const registeredRoutes = getRegisteredRoutes().map(route => {
+//   const normalizedPath = route.path.replace(/\/$/, '');
+//   const pattern = normalizedPath.replace(/:\w+/g, '[^/]+');
+//   return { method: route.method.toUpperCase(), pattern: new RegExp(`^${pattern}$`), original: normalizedPath };
+// });
+
+// app.use((req, res, next) => {
+//   const fullPath = req.originalUrl.split('?')[0];
+//   const method = req.method;
+//   const matched = registeredRoutes.find(r => r.method === method && r.pattern.test(fullPath));
+//   if (matched) {
+//     console.log(`Request: ${method} ${fullPath} -> Matched: ${matched.method} ${matched.original}`);
+//   } else {
+//     console.log(`Request: ${method} ${fullPath} -> Not registered`);
+//   }
+//   next();
+// });
 
 app.use("/api", apiRoutes);
 
@@ -62,7 +65,7 @@ app.use((err, req, res, next) => {
   res.status(err.status || 500).json({
     success: false,
     message: err.message || "Internal Server Error",
-  })
+  });
 });
 
 // console.log("Registered Routes:");
