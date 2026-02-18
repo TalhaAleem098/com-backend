@@ -1,77 +1,119 @@
 const mongoose = require("mongoose");
-const bcrypt = require("bcrypt");
-const { generateHash } = require("../utils/sha");
-const { encrypt, decrypt } = require("../utils/aes");
 
-const employeeSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  displayName: { type: String, default: null },
-  twoFactorEnabled: { type: Boolean, default: false },
-  email: {
-    hashed: { type: String, required: true, unique: true },
-    encrypted: { type: String, required: true },
+const employeeSchema = new mongoose.Schema(
+  {
+    // Personal Information
+    name: { type: String, required: true },
+    contactInfo: {
+      phone: { type: String },
+      address: { type: String },
+    },
+    avatarUrl: { type: String },
+
+    // Security Information
+    email: {
+      hashed: { type: String, required: true },
+      encrypted: { type: String, required: true },
+    },
+    password: { type: String, required: true },
+    twoFactorEnabled: { type: Boolean, default: false },
+
+    // Work Information
+    role: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Roles",
+      required: true,
+    },
+    hiringInfo: {
+      dateOfJoining: { type: Date },
+      position: { type: String },
+      department: { type: String },
+      manager: { type: mongoose.Schema.Types.ObjectId, ref: "Employees" },
+    },
+    salary: {
+      amount: { type: Number, required: true },
+      currency: { type: String, default: "PKR" },
+      effectiveDate: { type: Date, default: Date.now },
+    },
+    bankInfo: {
+      accountNumber: { type: String },
+      bankName: { type: String },
+      iban: { type: String },
+    },
+
+    // Status
+    isActive: { type: Boolean, default: true },
+
+    // History
+    loginHistory: [
+      {
+        timestamp: { type: Date, default: Date.now },
+        ipAddress: String,
+        userAgent: String,
+        successful: Boolean,
+      },
+    ],
+    actionHistory: [
+      {
+        resource: { type: String, required: true },
+        action: { type: String, required: true },
+        timestamp: { type: Date, default: Date.now },
+        details: { type: String },
+      },
+    ],
   },
-  password: { type: String, required: true },
-  role: { type: mongoose.Schema.Types.ObjectId, ref: 'Role', required: true },
-  status: { type: String, enum: ['active', 'inactive'], default: 'active' },
-  loginHistory: [{
-    timestamp: { type: Date, default: Date.now },
-    ip: { type: String },
-    userAgent: { type: String }
-  }],
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now }
-});
+  { timestamps: true },
+);
 
-// Pre-save hook to hash password and email
-employeeSchema.pre('save', async function(next) {
-  if (this.isModified('password')) {
-    this.password = await bcrypt.hash(this.password, 10);
-  }
-  if (this.isModified('email.encrypted')) {
-    this.email.hashed = generateHash(this.email.encrypted);
-  }
-  this.updatedAt = Date.now();
-  next();
-});
-
-// Method to verify password
-employeeSchema.methods.verifyPassword = async function(password) {
-  return bcrypt.compare(password, this.password);
-};
-
-// Method to add login history
-employeeSchema.methods.addLoginHistory = function(ip, userAgent) {
-  this.loginHistory.push({ ip, userAgent });
+// Methods
+employeeSchema.methods.updateLoginHistory = function (
+  ipAddress,
+  userAgent,
+  successful,
+) {
+  this.loginHistory.push({
+    timestamp: new Date(),
+    ipAddress,
+    userAgent,
+    successful,
+  });
   return this.save();
 };
 
-// Static method to find by email (decrypt and match)
-employeeSchema.statics.findByEmail = async function(email) {
-  const hashed = generateHash(email);
-  const employee = await this.findOne({ 'email.hashed': hashed });
-  if (employee) {
-    try {
-      const decryptedEmail = decrypt(employee.email.encrypted);
-      if (decryptedEmail === email) {
-        return employee;
-      }
-    } catch (error) {
-      console.error('Decryption error:', error);
-      return null;
-    }
-  }
-  return null;
+employeeSchema.methods.getLoginInfo = function () {
+  const lastLogin =
+    this.loginHistory.length > 0
+      ? this.loginHistory[this.loginHistory.length - 1]
+      : null;
+  const totalLogins = this.loginHistory.length;
+  const successfulLogins = this.loginHistory.filter(
+    (login) => login.successful,
+  ).length;
+  return {
+    lastLogin,
+    totalLogins,
+    successfulLogins,
+  };
 };
 
-// Method to get decrypted email
-employeeSchema.methods.getDecryptedEmail = function() {
-  try {
-    return decrypt(this.email.encrypted);
-  } catch (error) {
-    console.error('Decryption error:', error);
-    return null;
-  }
+employeeSchema.methods.updateSalary = function (
+  amount,
+  currency = "USD",
+  effectiveDate = new Date(),
+) {
+  this.salary = {
+    amount,
+    currency,
+    effectiveDate,
+  };
+  return this.save();
 };
 
-module.exports = mongoose.model("Employee", employeeSchema);
+employeeSchema.methods.getSalaryInfo = function () {
+  return this.salary;
+};
+
+const connection = mongoose.connection; // Default main database connection
+const Employees = connection.model("Employees", employeeSchema);
+
+module.exports = Employees;

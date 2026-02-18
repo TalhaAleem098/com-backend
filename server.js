@@ -5,7 +5,7 @@ require("dotenv").config({ quiet: true });
 const { connectDB } = require("./config/db");
 connectDB();
 const { initializeCronJobs } = require("./utils/cron");
-const { createSocketServer } = require("./routes/sockets.route");
+const { createSocketServer } = require("./socket/index");
 const http = require("http");
 // const { getRegisteredRoutes } = require("./utils/register.routes");
 
@@ -47,7 +47,6 @@ app.use((req, res, next) => {
 });
 
 app.use("/api", apiRoutes);
-
 
 app.use((req, res, next) => {
   res.status(404).json({

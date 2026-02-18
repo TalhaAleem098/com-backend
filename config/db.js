@@ -16,7 +16,7 @@ const connectDB = async () => {
       bufferTimeoutMS: 5000
     });
 
-    // Wait for chat connection
+    // Wait for chat connection 
     await new Promise((resolve, reject) => {
       chatConnection.once('connected', () => {
         console.log("Chat MongoDB connected");

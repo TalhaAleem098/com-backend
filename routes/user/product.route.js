@@ -103,7 +103,7 @@ router.get("/multiple", async (req, res) => {
       };
     });
 
-    console.log("Fetched multiple products:", simplifiedProducts);
+    // console.log("Fetched multiple products:", simplifiedProducts);
 
     return res.status(200).json({
       success: true,
